@@ -65,6 +65,17 @@ Download `AgentSketch-Windows.zip` from [Releases](https://github.com/devjay4561
 - Windows 10/11 x64 with the [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on Windows 11).
 - Builds are not code-signed, so SmartScreen may warn on first launch. Verify downloads with the published `SHA256SUMS.txt`.
 
+### 🤖 Let your AI agent install it
+
+Paste this into Claude Code, Codex, GJC or another agent. It reads the [agent install guide](docs/agent-install.md) and downloads, verifies, registers the MCP server, installs the skill and checks the connection. It asks you for the install and working folders first.
+
+```text
+Install AgentSketch and connect it to yourself over MCP.
+Follow https://raw.githubusercontent.com/devjay4561/AgentSketch/main/docs/agent-install.md step by step.
+```
+
+Requires Node.js 24 or newer. Once connected, ask something like "draw a flowchart of … in the AgentSketch app".
+
 ### First steps
 
 1. Choose **File → New board** (파일 → 새 보드).

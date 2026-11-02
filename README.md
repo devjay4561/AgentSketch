@@ -62,6 +62,17 @@
 - Windows 10/11 x64, [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (Windows 11에는 기본 포함)
 - 코드 서명이 없는 빌드라 처음 실행할 때 SmartScreen 경고가 나올 수 있습니다. 함께 게시한 `SHA256SUMS.txt`로 파일을 확인하세요.
 
+### 🤖 AI 에이전트에게 설치 맡기기
+
+Claude Code, Codex, GJC 같은 에이전트에게 아래 문장을 그대로 붙여 넣으세요. 에이전트가 [설치 안내](docs/agent-install.md)를 읽고 다운로드·검증·MCP 등록·스킬 설치·연결 확인까지 진행합니다. 설치 위치와 작업 폴더는 시작 전에 사용자에게 묻습니다.
+
+```text
+AgentSketch를 설치하고 너에게 MCP로 연결해 줘.
+https://raw.githubusercontent.com/devjay4561/AgentSketch/main/docs/agent-install.md 의 절차를 순서대로 따라 줘.
+```
+
+Node.js 24 이상이 필요합니다. 연결되면 "AgentSketch 앱에 ○○ 흐름도를 그려 줘"처럼 요청하면 됩니다.
+
 ### 처음 해보기
 
 1. **파일 → 새 보드**를 선택합니다.
