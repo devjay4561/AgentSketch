@@ -18,6 +18,8 @@ export function setLang(next: Lang) { localStorage.setItem(STORE, next); }
 
 const norm = (s: string) => s.replace(/\s+/g, ' ').trim();
 const fill = (s: string, vars: readonly unknown[]) => s.replace(/\{(\d+)\}/g, (m, i) => i < vars.length ? String(vars[+i]) : m);
+const isMacOS = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+export const formatShortcutLabel = (text: string) => isMacOS ? text.replace(/\bCtrl\b/g, '⌘') : text;
 const patterns: {re: RegExp; en: string}[] = [];
 for (const [ko, en] of Object.entries(EN)) {
   if (!/\{\d+\}/.test(ko)) continue;
@@ -35,23 +37,23 @@ patterns.sort((a, b) => b.re.source.replace(/\(\[\\s\\S\]\*\?\)/g, '').length - 
 
 /** Translate a Korean source string. `t('경로 없음 {0}개', n)` */
 export function t(ko: string, ...vars: unknown[]): string {
-  if (lang !== 'en') return fill(ko, vars);
+  if (lang !== 'en') return fill(formatShortcutLabel(ko), vars);
   // Keep authored line breaks when every line has its own entry.
   const lines = ko.split('\n');
   const en = (k: string) => EN_CONTENT[norm(k)] ?? EN[norm(k)];
-  if (lines.length > 1 && lines.every(l => !l.trim() || en(l) !== undefined)) return fill(lines.map(l => l.trim() ? en(l) : l).join('\n'), vars);
-  return fill(en(ko) ?? ko, vars);
+  if (lines.length > 1 && lines.every(l => !l.trim() || en(l) !== undefined)) return fill(formatShortcutLabel(lines.map(l => l.trim() ? en(l) : l).join('\n')), vars);
+  return fill(formatShortcutLabel(en(ko) ?? ko), vars);
 }
 
 /** English for whole Korean text produced elsewhere (DOM, Go errors). Undefined when unknown. */
 export function translateText(text: string, depth = 0): string | undefined {
   const ko = norm(text), exact = EN[ko];
-  if (exact !== undefined) return exact;
+  if (exact !== undefined) return formatShortcutLabel(exact);
   if (depth > 2) return undefined;
   for (const p of patterns) {
     const m = ko.match(p.re);
     // Slots often carry another known message (a Go error after "열 수 없습니다: "), so translate those too.
-    if (m) return p.en.replace(/\{@(\d+)\}/g, (_s, i) => { const part = m[+i + 1] ?? ''; return HANGUL.test(part) ? translateText(part, depth + 1) ?? part : part; });
+    if (m) return formatShortcutLabel(p.en).replace(/\{@(\d+)\}/g, (_s, i) => { const part = m[+i + 1] ?? ''; return HANGUL.test(part) ? translateText(part, depth + 1) ?? part : part; });
   }
   return undefined;
 }
@@ -78,6 +80,16 @@ function translateNode(node: Node) {
 
 /** In English, translate the static page and everything the app renders later. */
 export function installDomTranslation() {
+  if (isMacOS) {
+    for (const element of document.querySelectorAll<HTMLElement>('[title],[aria-label],kbd')) {
+      if (element.closest('[data-no-i18n],textarea,[contenteditable="true"]')) continue;
+      if (element instanceof HTMLElement && element.tagName === 'KBD') element.textContent = formatShortcutLabel(element.textContent ?? '');
+      for (const name of ['title', 'aria-label']) {
+        const value = element.getAttribute(name);
+        if (value) element.setAttribute(name, formatShortcutLabel(value));
+      }
+    }
+  }
   if (lang !== 'en') return;
   document.documentElement.lang = 'en';
   document.title = translateText(document.title) ?? document.title;

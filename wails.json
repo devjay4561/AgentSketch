@@ -9,5 +9,15 @@
   "frontend:dev:serverUrl": "auto",
   "wailsjsdir": ".",
   "author": { "name": "AgentSketch", "email": "" },
-  "info": { "companyName": "AgentSketch", "productName": "AgentSketch", "productVersion": "0.1.1", "copyright": "Copyright (c) 2026 AgentSketch contributors. MIT License.", "comments": "오프라인 플로우차트 편집기" }
+  "info": {
+    "companyName": "AgentSketch",
+    "productName": "AgentSketch",
+    "productVersion": "0.1.1",
+    "copyright": "Copyright (c) 2026 AgentSketch contributors. MIT License.",
+    "comments": "오프라인 플로우차트 편집기",
+    "fileAssociations": [
+      { "ext": "agentsketch", "name": "AgentSketch document", "description": "AgentSketch flowchart document", "iconName": "appicon", "role": "Editor" },
+      { "ext": "flowpaper", "name": "AgentSketch legacy document", "description": "Legacy FlowPaper document", "iconName": "appicon", "role": "Editor" }
+    ]
+  }
 }

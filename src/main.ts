@@ -19,7 +19,7 @@ import { isNative, openDocument, saveDocument, autosave, loadAutosave, exportFil
 import { icon } from './icons.ts';
 import { FONT_FAMILY, PALETTE } from './theme.ts';
 import { setupUIFeedback } from './ui-feedback.ts';
-import { installDomTranslation, lang, setLang, t } from './i18n.ts';
+import { installDomTranslation, lang, setLang, t, formatShortcutLabel } from './i18n.ts';
 
 installDomTranslation();
 setupUIFeedback();
@@ -67,10 +67,10 @@ let gesture: Gesture | null = null;
 const renderer = new Renderer(canvas, invalidate);
 
 function toast(message: string, error = false) {
-  const el = $('toast'); el.textContent = message; el.classList.toggle('error', error);
+  const el = $('toast'); el.textContent = formatShortcutLabel(message); el.classList.toggle('error', error);
   el.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, error ? 6500 : 3300);
 }
-function setStatus(message: string) { $('save-status').textContent = message; }
+function setStatus(message: string) { $('save-status').textContent = formatShortcutLabel(message); }
 function screenPoint(e: { clientX: number; clientY: number }): Point {
   const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top };
 }
@@ -615,7 +615,7 @@ canvas.addEventListener('contextmenu', e => {
   const menu = $('context-menu');
   const entries = n || selected.size ? [['next-step', '다음 단계 추가', ''], ['duplicate', '복제', 'Ctrl+D'], ['copy', '복사', 'Ctrl+C'], ['group', '묶기', 'Ctrl+G'], ['ungroup', '묶기 해제', 'Ctrl+Shift+G'], ['front', '맨 앞으로', ']'], ['back', '맨 뒤로', '['], ['lock', selectedNodes().every(n => n.locked) ? '잠금 해제' : '잠금', 'Ctrl+L'], ['fit-selection', '선택 요소로 이동', 'Shift+1'], ['delete', '삭제', 'Delete']] : edge ? [['delete', '연결선 삭제', 'Delete']] : [['paste', '붙여넣기', 'Ctrl+V'], ['fit', '전체 보기', '1'], ['image', '이미지 추가', ''], ['help', '단축키 보기', '?']];
   if(n?.details?.documentPath)entries.unshift(['open-linked-document','연결 문서 열기','Enter'],['relink-document','문서 다시 연결',''],['unlink-document','문서 연결 해제','']);
-  menu.innerHTML = entries.map(([a, text, key]) => `<button data-action="${a}"><span>${text}</span><kbd>${key}</kbd></button>`).join('');
+  menu.innerHTML = entries.map(([a, text, key]) => `<button data-action="${a}"><span>${text}</span><kbd>${formatShortcutLabel(key)}</kbd></button>`).join('');
   menu.hidden = false; menu.style.left = `${Math.min(e.clientX, window.innerWidth - 236)}px`; menu.style.top = `${Math.max(8, Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 12))}px`;
 });
 
@@ -698,7 +698,17 @@ async function initialize() {
       finishEdit(); clearTimeout(saveTimer);
       void (tabs?.flush()??Promise.resolve()).catch(error=>toast(`탭 복구 보관: ${String(error)}`,true)).then(()=>pathChange).then(()=>autosave(doc,filePath)).then(() => native.go.main.App.CloseWithRecoveryForDocument?native.go.main.App.CloseWithRecoveryForDocument(JSON.stringify(doc),filePath):native.go.main.App.CloseWithRecovery(JSON.stringify(doc))).catch(error => toast(`작업을 보존하지 못해 종료를 멈췄습니다. 파일로 저장하세요. ${String(error)}`, true));
     });
-    native.runtime.EventsOn('agentsketch:open-file',()=>{void (async()=>{try{const result=await (window as any).go.main.App.TakeLaunchDocument();if(result&&await guardReplace()){replaceDocument(validateDocument(JSON.parse(result.data)),result.path);fit();}}catch(error){toast(`파일을 열지 못했습니다. ${String(error)}`,true);}})();});
+    let openQueue=Promise.resolve();
+    native.runtime.EventsOn('agentsketch:open-file',()=>{
+      openQueue=openQueue.then(async()=>{
+        while(true){
+          const result=await (window as any).go.main.App.TakeLaunchDocument();
+          if(!result)break;
+          try{if(await guardReplace()){replaceDocument(validateDocument(JSON.parse(result.data)),result.path);fit();}}
+          catch(error){toast(`파일을 열지 못했습니다. ${String(error)}`,true);}
+        }
+      }).catch(error=>toast(`파일을 열지 못했습니다. ${String(error)}`,true));
+    });
     await native.go.main.App.Ready();
   }
 }

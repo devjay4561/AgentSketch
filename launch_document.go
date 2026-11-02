@@ -36,8 +36,13 @@ func launchDocumentPath(args []string, workingDirectory string) string {
 // The frontend owns unsaved-change confirmation and active-document assignment.
 func (a *App) TakeLaunchDocument() (*OpenResult, error) {
 	a.launchMu.Lock()
-	path := a.launchPath
-	a.launchPath = ""
+	var path string
+	if len(a.launchPaths) > 0 {
+		path = a.launchPaths[0]
+		copy(a.launchPaths, a.launchPaths[1:])
+		a.launchPaths[len(a.launchPaths)-1] = ""
+		a.launchPaths = a.launchPaths[:len(a.launchPaths)-1]
+	}
 	a.launchMu.Unlock()
 	if path == "" {
 		return nil, nil

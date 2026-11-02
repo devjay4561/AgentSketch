@@ -20,7 +20,17 @@ export async function resolvePath(file,root=process.cwd()){
  let resolved;try{resolved=await fs.realpath(target);}catch(e){if(e.code!=='ENOENT')throw e;let parent=path.dirname(target);while(true){try{const actual=await fs.realpath(parent);resolved=path.join(actual,path.relative(parent,target));break;}catch(error){if(error.code!=='ENOENT'||parent===path.dirname(parent))throw error;parent=path.dirname(parent);}}}
  const realRelative=path.relative(base,resolved);if(realRelative==='..'||realRelative.startsWith('..'+path.sep)||path.isAbsolute(realRelative))failure('OUTSIDE_ROOT','심볼릭 링크가 root 밖을 가리킵니다.');return target;
 }
-const profile=()=>path.join(process.env.APPDATA??path.join(os.homedir(),'.config'),'AgentSketch');
+export function profileDirectory(){
+ const base=process.platform==='win32'?process.env.APPDATA??path.join(os.homedir(),'AppData','Roaming')
+  :process.platform==='darwin'?path.join(os.homedir(),'Library','Application Support')
+  :process.env.XDG_CONFIG_HOME??path.join(os.homedir(),'.config');
+ return path.join(base,'AgentSketch');
+}
+const profile=profileDirectory;
+const normalizedPath=value=>process.platform==='win32'?value.toLowerCase():value;
+async function canonicalPath(file){try{return await fs.realpath(path.resolve(file));}catch{return path.resolve(file);}}
+async function samePath(left,right){const [a,b]=await Promise.all([canonicalPath(left),canonicalPath(right)]);return normalizedPath(a)===normalizedPath(b);}
+async function pathHistoryKey(file){return hash(normalizedPath(await canonicalPath(file))).slice(0,24);}
 export async function live(request){
  let info;try{info=JSON.parse(await fs.readFile(path.join(profile(),'automation.json'),'utf8'));}catch{failure('NOT_CONNECTED','connect 명령으로 앱에 연결하세요.');}
  const url=new URL(info.url);if(url.hostname!=='127.0.0.1'||url.protocol!=='http:'||!/^\w{64}$/.test(info.token))failure('INVALID_CONNECTION','로컬 연결 정보가 올바르지 않습니다.');
@@ -28,8 +38,20 @@ export async function live(request){
  if(!response.ok)failure('LIVE_ERROR',`${response.status}: ${await response.text()}`);const out=await response.json();if(!out.ok)failure(out.error?.code??'LIVE_ERROR',out.error?.message??'앱 명령 실패');return out.result;
 }
 export async function connect(executable){
- const file=executable??path.join(home,path.basename(home)==='AI'?'../AgentSketch.exe':'AgentSketch.exe');if(path.basename(file).toLowerCase()!=='agentsketch.exe')failure('INVALID_ARGUMENT','AgentSketch.exe 경로가 필요합니다.');await fs.access(file);
- const child=spawn(file,['--automation'],{detached:true,stdio:'ignore',windowsHide:true});child.unref();
+ let file=executable;
+ if(!file&&process.platform==='win32')file=path.join(home,path.basename(home)==='AI'?'../AgentSketch.exe':'AgentSketch.exe');
+ if(!file&&process.platform==='darwin'){
+  const candidates=path.basename(home)==='AI'?[path.resolve(home,'../../MacOS/AgentSketch')]:[path.join(home,'build/bin/AgentSketch.app/Contents/MacOS/AgentSketch'),path.join(home,'build/bin/AgentSketch')];
+  for(const candidate of candidates){try{await fs.access(candidate);file=candidate;break;}catch{}}
+ }
+ if(!file)failure('INVALID_ARGUMENT',process.platform==='darwin'?'AgentSketch.app 실행 파일을 찾을 수 없습니다. --exe로 지정하세요.':'AgentSketch 실행 파일 경로가 필요합니다.');
+ if(process.platform==='darwin'&&file.toLowerCase().endsWith('.app'))file=path.join(file,'Contents/MacOS/AgentSketch');
+ const expected=process.platform==='win32'?'agentsketch.exe':'AgentSketch';
+ if(path.basename(file).toLowerCase()!==expected.toLowerCase())failure('INVALID_ARGUMENT',`${expected} 경로가 필요합니다.`);
+ await fs.access(file);
+ const child=spawn(file,['--automation'],{detached:true,stdio:'ignore',windowsHide:process.platform==='win32'});
+ await new Promise((resolve,reject)=>{child.once('error',reject);child.once('spawn',resolve);});
+ child.unref();
  for(let i=0;i<80;i++){try{return await live({command:'session.read'});}catch{await new Promise(r=>setTimeout(r,150));}}
  failure('NOT_CONNECTED','앱 연결 시간이 초과되었습니다. 최신 AgentSketch.exe인지 확인하세요.');
 }
@@ -37,7 +59,7 @@ async function guardOpenFile(file){
  let state;try{state=JSON.parse(await fs.readFile(path.join(profile(),'open-documents.json'),'utf8'));}catch{return;}
  if(!Number.isInteger(state.pid)||!Array.isArray(state.paths))return;
  try{process.kill(state.pid,0);}catch(error){if(error.code==='ESRCH')return;}
- if(state.paths.some(p=>typeof p==='string'&&path.resolve(p).toLowerCase()===file.toLowerCase()))failure('DOCUMENT_OPEN','이 파일은 앱에서 열려 있습니다. --live와 expectedRevision을 사용하세요.');
+ for(const openPath of state.paths)if(typeof openPath==='string'&&await samePath(openPath,file))failure('DOCUMENT_OPEN','이 파일은 앱에서 열려 있습니다. --live와 expectedRevision을 사용하세요.');
 }
 export async function atomicOutput(file,data,{replace=false,expectedHash}={}){
  await fs.mkdir(path.dirname(file),{recursive:true});const lock=file+'.agentsketch-lock',temp=file+'.'+randomUUID()+'.tmp';let handle;
@@ -46,7 +68,7 @@ export async function atomicOutput(file,data,{replace=false,expectedHash}={}){
   let current;try{current=await boundedRead(file);}catch(e){if(e.code!=='ENOENT')throw e;}
   if(current&&!replace)failure('FILE_EXISTS','출력 파일이 이미 있습니다. overwrite:true를 명시하세요.');
   if(expectedHash!==undefined&&(!current||hash(current)!==expectedHash))failure('REVISION_CONFLICT','읽은 뒤 디스크 파일이 바뀌었습니다.');
-  let backup;if(current){const history=path.join(profile(),'cli-history',hash(file.toLowerCase()).slice(0,24));await fs.mkdir(history,{recursive:true});backup=path.join(history,Date.now()+'-'+randomUUID()+'.agentsketch');await fs.writeFile(backup,current,{flag:'wx'});const list=(await fs.readdir(history)).filter(n=>n.endsWith('.agentsketch')).sort();for(const old of list.slice(0,-12))await fs.unlink(path.join(history,old));}
+  let backup;if(current){const history=path.join(profile(),'cli-history',await pathHistoryKey(file));await fs.mkdir(history,{recursive:true});backup=path.join(history,Date.now()+'-'+randomUUID()+'.agentsketch');await fs.writeFile(backup,current,{flag:'wx'});const list=(await fs.readdir(history)).filter(n=>n.endsWith('.agentsketch')).sort();for(const old of list.slice(0,-12))await fs.unlink(path.join(history,old));}
   await fs.writeFile(temp,data,{flag:'wx'});const sync=await fs.open(temp,'r+');await sync.sync();await sync.close();
   // Recheck immediately before replacement as other applications do not honor our lock.
   if(current){const now=await boundedRead(file);if(hash(now)!==hash(current))failure('REVISION_CONFLICT','저장 도중 원본 파일이 바뀌었습니다.');}
@@ -59,7 +81,14 @@ export async function render(request){
  const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2','.ttf':'font/ttf','.svg':'image/svg+xml'};
  const server=http.createServer(async(req,res)=>{try{const url=new URL(req.url,'http://127.0.0.1'),name=decodeURIComponent(url.pathname).replace(/^\//,'');const file=await resolvePath(name||'render.html',dist);const bytes=await boundedRead(file);res.writeHead(200,{'Content-Type':mime[path.extname(file)]??'application/octet-stream','Cache-Control':'no-store'});res.end(bytes);}catch{res.writeHead(404);res.end();}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
- try{const {chromium}=await import('playwright-core');browser=await chromium.launch({channel:'msedge',headless:true,args:['--disable-features=AutofillAiWalletPrivatePasses']});const page=await browser.newPage();await page.goto(`http://127.0.0.1:${server.address().port}/render.html`);await page.waitForFunction(()=>typeof window.AgentSketchRender==='function');return await page.evaluate(r=>window.AgentSketchRender(r),request);}finally{await browser?.close();await new Promise(r=>server.close(r));}
+ try{
+  const {chromium}=await import('playwright-core');
+  const channels=process.platform==='win32'?['msedge']:['chrome','msedge'];
+  let launchError;
+  for(const channel of channels){try{browser=await chromium.launch({channel,headless:true,args:process.platform==='win32'?['--disable-features=AutofillAiWalletPrivatePasses']:[]});break;}catch(error){launchError=error;}}
+  if(!browser)failure('BROWSER_UNAVAILABLE',process.platform==='darwin'?'미리보기에는 설치된 Google Chrome 또는 Microsoft Edge가 필요합니다.':`미리보기 브라우저를 실행할 수 없습니다: ${launchError}`);
+  const page=await browser.newPage();await page.goto(`http://127.0.0.1:${server.address().port}/render.html`);await page.waitForFunction(()=>typeof window.AgentSketchRender==='function');return await page.evaluate(r=>window.AgentSketchRender(r),request);
+ }finally{await browser?.close();await new Promise(r=>server.close(r));}
 }
 export async function execute(request,{root=process.cwd()}={}){
  if(!request||typeof request!=='object')failure('INVALID_ARGUMENT','요청 객체 필요');

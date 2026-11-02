@@ -2,7 +2,7 @@
   "name": "agentsketch-desktop",
   "private": true,
   "version": "0.1.1",
-  "description": "Offline flowchart editor for Windows — map sources, prerequisites and processes on one canvas.",
+  "description": "Offline Windows and macOS flowchart editor — map sources, prerequisites and processes on one canvas.",
   "license": "MIT",
   "repository": {
     "type": "git",

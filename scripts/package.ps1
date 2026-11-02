@@ -9,10 +9,10 @@ $stageRoot = Join-Path $releaseRoot ('.source-' + [guid]::NewGuid().ToString('N'
 $sourceRoot = Join-Path $stageRoot 'AgentSketch-source'
 New-Item -ItemType Directory -Path $sourceRoot | Out-Null
 try {
-    foreach ($directory in @('src', 'public', 'third_party', 'scripts', 'docs', 'ai', 'skills')) {
+    foreach ($directory in @('src', 'public', 'third_party', 'scripts', 'docs', 'ai', 'skills', '.github')) {
         Copy-Item -LiteralPath (Join-Path $projectRoot $directory) -Destination $sourceRoot -Recurse
     }
-    $rootFiles = @('go.mod', 'go.sum', 'wails.json', 'index.html', 'render.html', 'vite.config.ts', 'agentsketch.cmd', 'tsconfig.json', 'package.json', 'package-lock.json', 'README.md', 'LICENSE','AGENTS.md', 'PRODUCT.md', 'DESIGN.md', '.gitignore')
+    $rootFiles = @('go.mod', 'go.sum', 'wails.json', 'index.html', 'render.html', 'vite.config.ts', 'agentsketch', 'agentsketch.cmd', 'tsconfig.json', 'package.json', 'package-lock.json', 'README.md', 'README.en.md', 'LICENSE','AGENTS.md', 'PRODUCT.md', 'DESIGN.md', '.gitignore')
     foreach ($file in $rootFiles) {
         Copy-Item -LiteralPath (Join-Path $projectRoot $file) -Destination $sourceRoot
     }
@@ -24,6 +24,7 @@ try {
     New-Item -ItemType Directory -Path $buildRoot, $playwrightRoot | Out-Null
     Copy-Item -LiteralPath (Join-Path $projectRoot 'build\appicon.png') -Destination $buildRoot
     Copy-Item -LiteralPath (Join-Path $projectRoot 'build\windows') -Destination $buildRoot -Recurse
+    Copy-Item -LiteralPath (Join-Path $projectRoot 'build\darwin') -Destination $buildRoot -Recurse
     Copy-Item -LiteralPath (Join-Path $projectRoot '.playwright\cli.config.json') -Destination $playwrightRoot
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -33,7 +34,7 @@ try {
     $archive = [System.IO.Compression.ZipFile]::OpenRead($sourceZip)
     try {
         $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
-        foreach ($required in @('main.go', 'build/appicon.png', 'build/windows/icon.ico', '.playwright/cli.config.json', 'third_party/go-webview2/go.mod')) {
+        foreach ($required in @('main.go', 'build/appicon.png', 'build/windows/icon.ico', 'build/darwin/Info.plist', 'scripts/build.sh', 'scripts/package-macos.sh', '.playwright/cli.config.json', 'third_party/go-webview2/go.mod')) {
             if ($names -notcontains "AgentSketch-source/$required") { throw "Source package missing: $required" }
         }
         if ($names -match '/(node_modules|output|\.tools|build/bin)/') { throw 'Source package contains generated artifacts' }

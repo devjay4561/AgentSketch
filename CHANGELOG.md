@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- macOS arm64 및 universal `.app` 빌드와 Windows/macOS CI·통합 릴리스 작업을 추가했습니다. Apple Vision OCR, Finder 문서 연결, macOS용 CLI 래퍼를 제공합니다.
+- macOS 앱은 Developer ID 서명과 공증 없이 배포되며, Gatekeeper 첫 실행 안내를 추가했습니다.
+
 ## [0.1.1] - 2026-11-02
 
 ### Added

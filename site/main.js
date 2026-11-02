@@ -13,7 +13,7 @@
     skip: 'Skip to content', navLabel: 'Page', navProof: 'How it works', navFeatures: 'Features', navAgent: 'AI agents', navDownload: 'Download',
     heroTitle: 'Scattered screenshots,<br />one clear flow.',
     heroLede: 'Paste your captures and hand them to an AI agent. Claude or Codex connects to the AgentSketch app and draws the shapes, routes the connectors and tidies the layout.',
-    ctaDownload: 'Download free for Windows', ctaSource: 'View source', metaFree: 'MIT open source', scrollHint: 'Scroll and the agent tidies up',
+    ctaDownload: 'Download for Windows / macOS', ctaSource: 'View source', metaFree: 'MIT open source', scrollHint: 'Scroll and the agent tidies up',
     stageAria: 'Example scene: an AI agent turns scattered screenshots into a flowchart', winTitle: 'Launch prep.agentsketch', winPill: 'External control',
     capDesignCh: 'design', capDesignWho: 'Mina', capDesignMsg: 'Final mockups v3 are up', capDesignWho2: 'Joon', capDesignMsg2: 'Contrast checked!',
     nodeDesign: 'Design mockups', capDevDone: 'Done', capDevTitle: 'Fix checkout bug and improve alerts', nodeDev: 'Feature build',
@@ -42,13 +42,13 @@
     localTitle: 'No installer wizard, no account, no cloud. <em>One 22 MB executable</em> does it all on your PC.',
     localSub: 'Documents and recovery files stay on your PC. No telemetry or update pings; OCR, external AI and LAN collaboration use the network only when you turn them on.',
     closeTitle: 'Download it and draw your first flow.', ctaStar: 'Star on GitHub',
-    reqOs: 'Requirements', reqOsD: 'Windows 10/11 x64, Microsoft Edge WebView2 (built into Windows 11)', reqAi: 'AI agents', reqAiD: 'Node.js 24+, Microsoft Edge',
+    reqOs: 'Requirements', reqOsD: 'Windows 10/11 x64 or macOS 12+', reqAi: 'AI agents', reqAiD: 'Node.js 24+, Edge on Windows or Chrome/Edge on macOS',
     reqSign: 'Signing', reqSignD: 'Builds are not code-signed, so SmartScreen may warn on first launch.', reqSha: 'Verify with SHA256',
     footLabel: 'Footer', footReleases: 'Releases', footGuide: 'User guide (KO)', footSecurity: 'Security', footLicense: 'MIT License · Font based on Pretendard (SIL OFL)',
   };
   const META = {
     ko: { title: document.title, desc: $('meta[name="description"]').content, typed: '흩어진 캡처들, 출시 흐름으로 정리해줘', count: (n, e) => `${n}개 요소 · ${e}개 연결`, toggle: 'EN', toggleAria: 'Switch to English', size: mb => `ZIP ${mb} MB` },
-    en: { title: 'AgentSketch · Scattered screenshots, one clear flow', desc: 'A Windows flowchart editor that AI agents draw in. 22 MB single executable, offline, free and open source.', typed: 'Turn these screenshots into a launch flow', count: (n, e) => `${n} elements · ${e} connectors`, toggle: '한국어', toggleAria: '한국어로 보기', size: mb => `ZIP ${mb} MB` },
+    en: { title: 'AgentSketch · Scattered screenshots, one clear flow', desc: 'An offline flowchart editor for Windows and macOS that AI agents can control.', typed: 'Turn these screenshots into a launch flow', count: (n, e) => `${n} elements · ${e} connectors`, toggle: '한국어', toggleAria: '한국어로 보기', size: mb => `Windows ZIP ${mb} MB` },
   };
   const KO = new Map();
   $$('[data-k]').forEach(el => KO.set(el, el.innerHTML));

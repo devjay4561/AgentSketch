@@ -4,12 +4,13 @@
 
 # AgentSketch <sup>Beta</sup>
 
-**Map sources, prerequisites and processes on one canvas — a lightweight, offline flowchart editor for Windows**
+**Map sources, prerequisites and processes on one canvas — an offline flowchart editor for Windows and macOS**
 
 [![CI](https://github.com/devjay4561/AgentSketch/actions/workflows/ci.yml/badge.svg)](https://github.com/devjay4561/AgentSketch/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/devjay4561/AgentSketch?display_name=tag&sort=date&include_prereleases)](https://github.com/devjay4561/AgentSketch/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-f76b15.svg)](LICENSE)
-![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4?logo=windows)
+![Windows](https://img.shields.io/badge/Windows-10%2B-0078D4?logo=windows)
+![macOS](https://img.shields.io/badge/macOS-12%2B-555555?logo=apple)
 ![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
 ![Wails](https://img.shields.io/badge/Wails-v2.17-DF0000)
@@ -35,8 +36,8 @@
 
 Place shapes, text, notes and images on a large sheet and connect them to explain **where each piece of information comes from and what it is a prerequisite for**. It is designed around pasting screenshots and annotating them.
 
-- 🪶 **Lightweight** — a ~22 MB single executable on Windows WebView2. No Node server, no bundled Chromium, and nothing is redrawn while you are not editing.
-- 🔒 **Local-first** — editing, saving and exporting all happen on your PC. OCR, AI requests and LAN collaboration use the network only when you turn them on.
+- 🪶 **Lightweight** — one Windows WebView2 executable or a native WKWebView app on macOS. No Node server or bundled Chromium, and nothing is redrawn while you are not editing.
+- 🔒 **Local-first** — editing, saving and exporting all happen on your computer. OCR uses Windows OCR or Apple Vision locally; AI requests and LAN collaboration use the network only when you turn them on.
 - 🧭 **Relationship-centric** — orthogonal connectors that route around obstacles, waypoints, conditional prerequisites, source/version/verification records and change-impact tracing.
 - 🤖 **Agent-friendly** — 104 commands exposed through a CLI and an MCP (stdio) server, so agents such as Claude or Codex can create and edit documents.
 - 📤 **Export anywhere** — PNG, SVG, PDF (vector text), editable PPTX, HTML, CSV and draw.io.
@@ -65,6 +66,13 @@ Download `AgentSketch-Windows.zip` from [Releases](https://github.com/devjay4561
 - Windows 10/11 x64 with the [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on Windows 11).
 - Builds are not code-signed, so SmartScreen may warn on first launch. Verify downloads with the published `SHA256SUMS.txt`.
 
+### macOS
+
+Download `AgentSketch-macOS-universal.zip` from [Releases](https://github.com/devjay4561/AgentSketch/releases/latest), move `AgentSketch.app` to Applications, then launch it. Universal builds support Apple Silicon and Intel Macs; if a universal build is unavailable, use the arm64 archive on Apple Silicon.
+
+- Requires macOS 12 or newer. OCR runs locally with Apple Vision and uses the recognition languages supported by macOS.
+- The app has no Developer ID signature and is not notarized. If Gatekeeper blocks the first launch, verify the download and choose **System Settings → Privacy & Security → Open Anyway**. See [Apple's instructions](https://support.apple.com/en-sg/102445).
+
 ### 🤖 Let your AI agent install it
 
 Paste this into Claude Code, Codex, GJC or another agent. It reads the [agent install guide](docs/agent-install.md) and downloads, verifies, registers the MCP server, installs the skill and checks the connection. It asks you for the install and working folders first.
@@ -80,12 +88,12 @@ Requires Node.js 24 or newer. Once connected, ask something like "draw a flowcha
 
 1. Choose **File → New board** (파일 → 새 보드).
 2. Pick rectangle, text or note in the left toolbar and click or drag on the canvas.
-3. Paste a screenshot with **Ctrl+V**, or drop an image file onto the canvas.
+3. Paste a screenshot with **Ctrl+V on Windows** or **⌘V on Mac**, or drop an image file onto the canvas.
 4. With the **connector** tool, click the source element and then the target.
-5. Save a `.agentsketch` file with **Ctrl+S**, and use **Export** (내보내기) for shareable files.
+5. Save a `.agentsketch` file with **Ctrl+S on Windows** or **⌘S on Mac**, and use **Export** (내보내기) for shareable files.
 
 > [!IMPORTANT]
-> **Autosave is not the same as saving a file.** Autosave keeps only the most recent board in `%APPDATA%\AgentSketch`. To keep several boards or move them to another PC, always save with **Ctrl+S**.
+> **Autosave is not the same as saving a file.** Windows stores recovery under `%APPDATA%\AgentSketch`; macOS stores it under `~/Library/Application Support/AgentSketch`. To keep several boards or move them to another PC, save a document file.
 
 ## Controlling it with AI agents
 
@@ -97,6 +105,13 @@ agentsketch.cmd execute --request request.json --root C:\work
 agentsketch.cmd connect                              # attach to the running app (shows an "external control" banner)
 ```
 
+On macOS, use the wrapper included in the app bundle:
+
+```sh
+"/Applications/AgentSketch.app/Contents/Resources/agentsketch" capabilities --query node
+"/Applications/AgentSketch.app/Contents/Resources/agentsketch" connect
+```
+
 ```jsonc
 // MCP host configuration (per-agent commands: docs/agent-install.md)
 { "mcpServers": { "agentsketch": { "command": "node", "args": ["<release folder>/AI/ai/cli.mjs", "mcp", "--root", "C:\\work"] } } }
@@ -104,19 +119,27 @@ agentsketch.cmd connect                              # attach to the running app
 
 - Changes are applied atomically per batch; `dryRun` returns the plan only. In the app, one Ctrl+Z undoes a whole batch.
 - The live connection uses a random `127.0.0.1` port with a session token and rejects website origins.
-- The CLI/MCP requires Node.js 24+; previews and exports render with Microsoft Edge.
+- The CLI/MCP requires Node.js 24+; previews and exports render with Microsoft Edge on Windows or installed Chrome/Edge on macOS.
 
 The full command map is in [AI-사용안내.md](docs/AI-사용안내.md) (Korean).
 
 ## Build from source
 
-**Requirements:** Windows 10/11, Go 1.26+, Node.js 24 LTS, npm. The first build downloads dependencies and the Wails CLI (v2.17.0).
+**Requirements:** Go 1.26+, Node.js 24 LTS, npm. Windows builds need Windows 10/11; macOS builds need macOS 12+ and Xcode Command Line Tools. The first build downloads dependencies and the Wails CLI (v2.17.0).
 
 ```powershell
 git clone https://github.com/devjay4561/AgentSketch.git
 cd AgentSketch
 ./scripts/build.ps1          # npm ci → frontend build → tests → build/bin/AgentSketch.exe
 ./scripts/package.ps1        # release/AgentSketch-Windows.zip, release/AgentSketch-source.zip
+```
+
+On macOS, build either Apple Silicon or universal binaries and package the app:
+
+```sh
+./scripts/build.sh --arch arm64
+./scripts/build.sh --arch universal
+./scripts/package-macos.sh           # app ZIP and DMG
 ```
 
 The Wails CLI is installed only into the project's `.tools/bin`. For the per-user NSIS installer see [scripts/INSTALLER.md](scripts/INSTALLER.md).
@@ -142,10 +165,10 @@ UI checks use the installed Microsoft Edge with Playwright.
 ## Architecture
 
 ```text
-┌───────────────────────── AgentSketch.exe (Go + Wails v2) ─────────────────────────┐
+┌──────────────── AgentSketch (Go + Wails v2; WebView2 / WKWebView) ────────────────┐
 │  main.go / app.go       window, single instance, recovery save before exit        │
 │  store.go / export.go   file dialogs, save, recovery, export writes              │
-│  ocr_windows.go         Windows.Media.Ocr (on request)                           │
+│  ocr_windows.go / ocr_darwin.go  Windows OCR / Apple Vision (on request)          │
 │  collaboration.go / ai.go   LAN sharing, external AI requests (opt-in only)       │
 │ ┌───────────────── WebView2 (embedded dist/) ──────────────────┐                 │
 │ │ src/main.ts         editing, selection, shortcuts, panels     │                 │
@@ -161,7 +184,7 @@ ai/cli.mjs ── CLI · MCP stdio ── same document engine (src/commands.ts)
 | Path | Role |
 | --- | --- |
 | `src/` | TypeScript editor, document engine, renderer, exporters |
-| `*.go` | Windows desktop shell: files, recovery, OCR, sharing, automation |
+| `*.go` | Shared desktop app plus tagged Windows/macOS native adapters |
 | `ai/` | CLI and MCP server |
 | `skills/agentsketch/` | Skill for AI agents |
 | `scripts/` | Build, packaging, installer and UI checks |

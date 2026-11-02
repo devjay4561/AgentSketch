@@ -1,7 +1,9 @@
 # AgentSketch — install guide for AI agents
 
+Windows guide: install AgentSketch and connect it over MCP with PowerShell. For macOS, follow [agent-install-macos.md](agent-install-macos.md).
+
 You are an AI agent asked to install AgentSketch and connect yourself to it over MCP.
-Follow these steps in order. Use PowerShell on Windows. Do not skip the verification step.
+Follow these steps in order. Do not skip the verification step.
 
 AgentSketch is an offline Windows flowchart editor. Its MCP server lets you create and edit
 `.agentsketch` documents and control the running app. It needs no API key and makes no
