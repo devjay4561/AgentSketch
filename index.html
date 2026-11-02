@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light" />
+  <meta name="description" content="자료와 생각을 자유롭게 연결하는 로컬 플로우차트 편집기" />
+  <title>AgentSketch · 플로우페이퍼</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preload" href="/fonts/PretendardVariable.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <div class="brand" title="AgentSketch · 플로우페이퍼">
+        <svg class="brand-mark" width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="8" fill="#f76b15"/><path d="M10 9h14v5H15v4h7v5h-7v4h-5Z" fill="#fff"/><path class="brand-tail" d="m23 23 4 4" stroke="#1c2024" stroke-width="3" stroke-linecap="round"/></svg>
+        <span>AgentSketch</span>
+      </div>
+      <span class="header-divider" aria-hidden="true"></span>
+      <details class="menu file-menu">
+        <summary class="plain-button" aria-label="파일 메뉴">파일 <span data-icon="chevron" data-size="15"></span></summary>
+        <div class="dropdown file-dropdown">
+          <button data-action="new" aria-label="새 보드"><span data-icon="new"></span><span>새 보드</span><kbd>Ctrl N</kbd></button>
+          <button data-action="open" aria-label="열기"><span data-icon="open"></span><span>열기</span><kbd>Ctrl O</kbd></button>
+          <button data-action="save" aria-label="저장"><span data-icon="save"></span><span>저장</span><kbd>Ctrl S</kbd></button>
+          <button data-action="save-as" aria-label="다른 이름으로 저장"><span data-icon="save-as"></span><span>다른 이름으로 저장</span><kbd>Ctrl Shift S</kbd></button>
+          <div class="menu-separator"></div>
+          <p class="menu-caption">예시로 시작하기</p>
+          <button data-action="template-launch" aria-label="서비스 출시 준비 지도 예시 열기"><span data-icon="auto-layout"></span><span>서비스 출시 준비 지도</span></button>
+          <button data-action="template-simple" aria-label="간단한 절차 예시 열기"><span data-icon="connect"></span><span>간단한 절차</span></button>
+        </div>
+      </details>
+      <div class="document-heading">
+        <input id="document-title" value="서비스 출시 준비 지도" aria-label="보드 이름" spellcheck="false" maxlength="120" />
+        <span id="save-status" class="save-status">이 기기에 자동 복구</span>
+      </div>
+      <div class="header-actions"><button class="secondary-button" data-action="automation" hidden title="이 PC의 CLI·MCP가 현재 화면을 제어하고 있습니다. 눌러서 연결을 끕니다.">외부 제어 중 ✕</button><button class="secondary-button" data-action="ai-follow" hidden aria-pressed="true" title="AI가 바꾼 곳으로 화면을 옮깁니다.">화면 따라가기</button><button class="secondary-button workbench-button" data-action="workbench" aria-label="업무 도구">업무 도구</button>
+        <div class="undo-group">
+          <button class="icon-button" data-action="undo" title="실행 취소 (Ctrl+Z)" aria-label="실행 취소 (Ctrl+Z)"><span data-icon="undo"></span></button>
+          <button class="icon-button" data-action="redo" title="다시 실행 (Ctrl+Shift+Z)" aria-label="다시 실행 (Ctrl+Shift+Z)"><span data-icon="redo"></span></button>
+        </div>
+        <span class="header-divider" aria-hidden="true"></span>
+        <button class="icon-button" data-action="advanced-layout" title="고급 배치 설정" aria-label="고급 배치 설정"><span data-icon="properties" data-size="16"></span></button><button class="secondary-button layout-button" data-action="auto-layout" title="연결 관계를 따라 자동 배치" aria-label="자동 배치"><span data-icon="auto-layout" data-size="18"></span><span>자동 배치</span></button>
+        <button class="icon-button focus-button" data-action="focus" title="작업 공간 넓게 보기 (Tab)" aria-label="작업 공간 넓게 보기 (Tab)"><span data-icon="focus" data-size="18"></span></button>
+        <details class="menu export-menu">
+          <summary class="primary-button" aria-label="내보내기 메뉴"><span data-icon="export" data-size="17"></span>내보내기 <span data-icon="chevron" data-size="14"></span></summary>
+          <div class="dropdown export-dropdown">
+            <p class="menu-caption">보드 전체 내보내기</p>
+            <button data-action="export-png" aria-label="PNG 이미지로 저장"><span class="format-badge">PNG</span><span>이미지로 저장<small>문서·메신저에 붙여넣기</small></span></button>
+            <button data-action="export-svg" aria-label="SVG 벡터로 저장"><span class="format-badge">SVG</span><span>벡터로 저장<small>확대해도 선명한 도형</small></span></button>
+            <button data-action="export-pdf" aria-label="PDF로 저장"><span class="format-badge">PDF</span><span>PDF로 저장<small>공유·인쇄용 한 장</small></span></button>
+            <button data-action="export-html" aria-label="HTML 뷰어로 저장"><span class="format-badge">HTML</span><span>웹 뷰어로 저장<small>브라우저에서 확대·축소·이동</small></span></button>
+          </div>
+        </details>
+      </div>
+    </header>
+
+    <div id="document-tabs"></div>
+    <div class="workspace">
+      <nav class="tools-rail" aria-label="그리기 도구">
+        <div class="tool-group">
+          <button class="tool-button active" data-tool="select" title="선택 (V)" aria-label="선택 (V)" aria-pressed="true"><span data-icon="select"></span></button>
+          <button class="tool-button" data-tool="hand" title="화면 이동 (H 또는 Space)" aria-label="화면 이동 (H 또는 Space)" aria-pressed="false"><span data-icon="hand"></span></button>
+        </div>
+        <div class="rail-divider"></div>
+        <div class="tool-group">
+          <button class="tool-button" data-tool="rect" title="사각형 (R)" aria-label="사각형 (R)" aria-pressed="false"><span data-icon="rect"></span></button>
+          <button class="tool-button" data-tool="round" title="둥근 사각형" aria-label="둥근 사각형" aria-pressed="false"><span data-icon="round"></span></button>
+          <button class="tool-button" data-tool="ellipse" title="타원 (O)" aria-label="타원 (O)" aria-pressed="false"><span data-icon="ellipse"></span></button>
+          <button class="tool-button" data-tool="diamond" title="판단 마름모 (D)" aria-label="판단 마름모 (D)" aria-pressed="false"><span data-icon="diamond"></span></button>
+        </div>
+        <div class="rail-divider"></div>
+        <div class="tool-group">
+          <button class="tool-button" data-tool="text" title="텍스트 (T)" aria-label="텍스트 (T)" aria-pressed="false"><span data-icon="text"></span></button>
+          <button class="tool-button" data-tool="note" title="메모 (N)" aria-label="메모 (N)" aria-pressed="false"><span data-icon="note"></span></button>
+          <button class="tool-button" data-action="image" title="이미지 넣기 (Ctrl+Shift+I)" aria-label="이미지 넣기 (Ctrl+Shift+I)"><span data-icon="image"></span></button>
+          <button class="tool-button" data-action="document-card" title="문서 카드 추가 · 상세 문서를 연결합니다" aria-label="문서 카드 추가"><span data-icon="file"></span></button>
+        </div>
+        <div class="rail-divider"></div>
+        <div class="tool-group">
+          <button class="tool-button" data-tool="connect" title="연결선 (C)" aria-label="연결선 (C)" aria-pressed="false"><span data-icon="connect"></span></button>
+          <button class="tool-button" data-tool="draw" title="자유 그리기 (P)" aria-label="자유 그리기 (P)" aria-pressed="false"><span data-icon="draw"></span></button>
+          <button class="tool-button" data-tool="frame" title="영역 상자 (F)" aria-label="영역 상자 (F)" aria-pressed="false"><span data-icon="frame"></span></button>
+        </div>
+        <div class="rail-bottom">
+          <button class="tool-button" data-action="help" title="도움말 및 단축키 (?)" aria-label="도움말 및 단축키 (?)"><span data-icon="help"></span></button>
+        </div>
+      </nav>
+
+      <main id="canvas-wrap" aria-label="보드 작업 공간">
+        <canvas id="board" tabindex="0" aria-label="플로우차트 캔버스. 도구를 선택하고 드래그해서 그립니다. Space를 누른 채 드래그하면 화면을 이동합니다."></canvas>
+        <textarea id="text-editor" aria-label="선택한 요소의 텍스트 편집" spellcheck="false" hidden></textarea>
+        <div class="canvas-topbar">
+          <div class="canvas-label"><span class="status-dot"></span><span id="tool-hint">선택하고, 자유롭게 연결하세요</span><button id="route-warning" data-action="blocked-route" class="route-warning" hidden></button></div>
+          <button class="canvas-fit" data-action="fit" title="보드 전체 보기 (Ctrl+0)" aria-label="보드 전체 보기"><span data-icon="fit" data-size="15"></span>전체 보기</button>
+        </div>
+        <div id="drop-overlay" hidden><span data-icon="image" data-size="40"></span><strong>이미지를 여기에 놓으세요</strong><span>그림도 하나의 요소처럼 자유롭게 움직일 수 있습니다.</span></div>
+        <div class="canvas-bottom-controls">
+          <div class="zoom-controls" aria-label="확대 및 축소">
+            <button class="icon-button" data-action="zoom-out" title="축소 (-)" aria-label="축소 (-)"><span data-icon="minus" data-size="16"></span></button>
+            <button id="zoom-value" data-action="zoom-reset" title="100%로 보기" aria-label="100%로 보기">100%</button>
+            <button class="icon-button" data-action="zoom-in" title="확대 (+)" aria-label="확대 (+)"><span data-icon="plus" data-size="16"></span></button>
+          </div>
+          <div class="canvas-options">
+            <label class="canvas-option" title="격자 표시"><input id="grid-toggle" type="checkbox" checked /><span data-icon="grid" data-size="16"></span><span>격자</span></label>
+            <label class="canvas-option" title="격자에 맞춰 이동"><input id="snap-toggle" type="checkbox" checked /><span data-icon="snap" data-size="16"></span><span>맞춤</span></label>
+          </div>
+        </div>
+        <div class="minimap-shell"><span>보드 미리보기</span><canvas id="minimap" width="172" height="106" aria-label="보드 미리보기. 클릭하면 해당 위치로 이동합니다." tabindex="0"></canvas></div>
+      </main>
+
+      <aside class="inspector" aria-label="요소 속성 및 레이어">
+        <div class="inspector-tabs" role="tablist" aria-label="사이드 패널">
+          <button id="properties-tab" class="inspector-tab active" data-tab="properties" role="tab" aria-label="속성 패널" aria-selected="true" aria-controls="properties-panel"><span data-icon="properties" data-size="16"></span>속성</button>
+          <button id="layers-tab" class="inspector-tab" data-tab="layers" role="tab" aria-label="레이어 패널" aria-selected="false" aria-controls="layers-panel"><span data-icon="layers" data-size="16"></span>레이어</button>
+        </div>
+        <div id="properties-panel" role="tabpanel" aria-labelledby="properties-tab">
+          <div class="selection-heading"><span id="selection-summary">선택한 요소 없음</span><span class="selection-mark"></span></div>
+          <p id="selection-description" class="selection-description" hidden>첫 요소의 값이 표시됩니다. 변경한 값은 선택한 모든 요소에 적용됩니다.</p>
+          <div id="empty-inspector">
+            <svg class="empty-illustration" viewBox="0 0 200 115" width="200" height="115" aria-hidden="true"><rect x="13" y="20" width="70" height="43" rx="6" fill="#eff2f6" stroke="#cbd2da"/><rect x="117" y="54" width="70" height="43" rx="6" fill="#fff0e5" stroke="#f5a36a"/><path d="M83 41h17v34h17m-5-5 5 5-5 5" fill="none" stroke="#f76b15" stroke-width="2"/><path d="M30 36h36m-36 10h23m71 23h35m-35 10h22" stroke="#606873" stroke-width="2" stroke-linecap="round"/></svg>
+            <h2>자료가 모이면,<br />흐름이 보입니다.</h2>
+            <p>도형이나 이미지를 선택하면<br />이곳에서 모양과 내용을 바꿀 수 있어요.</p>
+            <div class="quick-tips"><p><kbd>더블클릭</kbd><span>글자 편집</span></p><p><kbd>Ctrl V</kbd><span>이미지 붙여넣기</span></p><p><kbd>Shift 클릭</kbd><span>여러 요소 선택</span></p><p><kbd>Space 드래그</kbd><span>작업지 이동</span></p></div>
+            <button class="text-button" data-action="help" aria-label="사용법 및 단축키">모든 단축키 보기 <span data-icon="arrow" data-size="15"></span></button>
+          </div>
+          <div id="inspector-content">
+            <div id="node-inspector" hidden>
+              <section class="inspector-section">
+                <h2>내용</h2>
+                <textarea id="node-text" class="content-input" rows="3" placeholder="내용을 입력하세요" aria-label="요소 내용"></textarea>
+                <div id="linked-document-info" hidden><p id="linked-document-path" style="overflow-wrap:anywhere;font-size:12px"></p><button class="secondary-button" data-action="open-linked-document">상세 문서 열기</button><button class="secondary-button" data-action="relink-document">다시 연결</button></div>
+                <div class="text-format">
+                  <label class="font-number"><span class="sr-only">글자 크기</span><input id="node-font" type="number" min="8" max="120" value="18" title="글자 크기" /><span>px</span></label>
+                  <label class="bold-toggle" title="굵은 글씨"><input id="node-bold" type="checkbox" aria-label="굵은 글씨" /><span>B</span></label>
+                  <select id="node-align" aria-label="글자 정렬"><option value="left">왼쪽 정렬</option><option value="center">가운데</option><option value="right">오른쪽 정렬</option></select>
+                </div>
+              </section>
+              <section class="inspector-section">
+                <h2>모양</h2>
+                <div class="color-row"><label for="node-fill">채우기</label><input id="node-fill" type="color" value="#ffffff" /></div>
+                <div class="color-row"><label for="node-stroke">테두리</label><input id="node-stroke" type="color" value="#97aca2" /></div>
+                <div class="color-row"><label for="node-color">글자</label><input id="node-color" type="color" value="#263b32" /></div>
+                <div class="field-row"><label for="node-stroke-width">선 두께</label><div class="number-with-unit"><input id="node-stroke-width" type="number" min="0" max="12" step="0.5" value="1.5" /><span>px</span></div><label class="check-label"><input id="node-dashed" type="checkbox" />점선</label></div>
+                <div class="field-row opacity-field"><label for="node-opacity">불투명도</label><input id="node-opacity" type="range" min="0.1" max="1" step="0.05" value="1" /></div>
+              </section>
+              <section class="inspector-section">
+                <h2>위치와 크기</h2>
+                <div class="geometry-grid">
+                  <label><span>X</span><input id="node-x" type="number" step="1" value="0" aria-label="가로 위치" /></label>
+                  <label><span>Y</span><input id="node-y" type="number" step="1" value="0" aria-label="세로 위치" /></label>
+                  <label><span>W</span><input id="node-width" type="number" min="20" max="10000" value="180" aria-label="너비" /></label>
+                  <label><span>H</span><input id="node-height" type="number" min="20" max="10000" value="96" aria-label="높이" /></label>
+                </div>
+                <label class="lock-toggle"><input id="node-locked" type="checkbox" /><span data-icon="lock" data-size="14"></span>위치와 크기 잠금</label>
+              </section>
+              <section class="inspector-section alignment-section">
+                <h2>여러 요소 묶기</h2><div class="dual-actions"><button class="subtle-button" data-action="group" title="그룹 만들기 (Ctrl+G)" aria-label="그룹 만들기">그룹 만들기</button><button class="subtle-button" data-action="ungroup" title="그룹 풀기 (Ctrl+Shift+G)" aria-label="그룹 풀기">그룹 풀기</button></div><p class="layers-hint">Shift+클릭 또는 빈 곳에서 드래그해 여러 요소를 선택하세요.</p><h2>정렬과 간격</h2>
+                <div class="alignment-grid">
+                  <button class="icon-button" data-action="align-left" title="왼쪽 맞춤" aria-label="왼쪽 맞춤"><span data-icon="align-left" data-size="18"></span></button>
+                  <button class="icon-button" data-action="align-center" title="가로 가운데 맞춤" aria-label="가로 가운데 맞춤"><span data-icon="align-center" data-size="18"></span></button>
+                  <button class="icon-button" data-action="align-right" title="오른쪽 맞춤" aria-label="오른쪽 맞춤"><span data-icon="align-right" data-size="18"></span></button>
+                  <button class="icon-button" data-action="align-top" title="위쪽 맞춤" aria-label="위쪽 맞춤"><span data-icon="align-top" data-size="18"></span></button>
+                  <button class="icon-button" data-action="align-middle" title="세로 가운데 맞춤" aria-label="세로 가운데 맞춤"><span data-icon="align-middle" data-size="18"></span></button>
+                  <button class="icon-button" data-action="align-bottom" title="아래쪽 맞춤" aria-label="아래쪽 맞춤"><span data-icon="align-bottom" data-size="18"></span></button>
+                </div>
+                <div class="dual-actions"><button class="subtle-button" data-action="distribute-horizontal" title="가로 간격을 같게" aria-label="가로 간격 같게"><span data-icon="distribute-horizontal" data-size="16"></span>가로 간격</button><button class="subtle-button" data-action="distribute-vertical" title="세로 간격을 같게" aria-label="세로 간격 같게"><span data-icon="distribute-vertical" data-size="16"></span>세로 간격</button></div>
+              </section>
+              <section class="inspector-section arrange-section">
+                <h2>구성과 순서</h2>
+                <div class="dual-actions"><button class="subtle-button" data-action="front" aria-label="맨 앞으로"><span data-icon="front" data-size="16"></span>맨 앞으로</button><button class="subtle-button" data-action="back" aria-label="맨 뒤로"><span data-icon="back" data-size="16"></span>맨 뒤로</button></div>
+                <div class="dual-actions"><button class="subtle-button" data-action="duplicate" title="복제 (Ctrl+D)" aria-label="복제"><span data-icon="duplicate" data-size="16"></span>복제</button><button class="subtle-button danger" data-action="delete" title="삭제 (Delete)" aria-label="선택 항목 삭제"><span data-icon="delete" data-size="16"></span>삭제</button></div>
+              </section>
+            </div>
+            <div id="edge-inspector" hidden><section class="inspector-section"><p id="route-help" class="layers-hint">주황 손잡이를 드래그해 경로를 조절하세요.</p><button class="subtle-button full-width" data-action="reset-route">자동 경로로 되돌리기</button></section>
+              <section class="inspector-section"><h2>연결선</h2><label class="stacked-field" for="edge-label">선 위의 설명<input id="edge-label" type="text" placeholder="예: 확인 후 진행" maxlength="300" /></label><label class="stacked-field" for="edge-style">연결 방식<select id="edge-style"><option value="elbow">직각으로 연결</option><option value="straight">직선으로 연결</option><option value="curve">곡선으로 연결</option></select></label><label class="stacked-field" for="edge-arrow">화살표<select id="edge-arrow"><option value="end">끝에 화살표</option><option value="both">양쪽 화살표</option><option value="none">화살표 없음</option></select></label></section>
+              <section class="inspector-section"><h2>선 모양</h2><div class="color-row"><label for="edge-color">색상</label><input id="edge-color" type="color" value="#608578" /></div><div class="field-row"><label for="edge-width">선 두께</label><div class="number-with-unit"><input id="edge-width" type="number" min="1" max="12" step="0.5" value="2" /><span>px</span></div><label class="check-label"><input id="edge-dashed" type="checkbox" />점선</label></div></section>
+              <section class="inspector-section"><button class="subtle-button danger full-width" data-action="delete" aria-label="선택 항목 삭제"><span data-icon="delete" data-size="16"></span>연결선 삭제</button></section>
+            </div>
+          </div>
+        </div>
+        <div id="layers-panel" role="tabpanel" aria-labelledby="layers-tab" hidden>
+          <div class="layer-search"><span data-icon="search" data-size="16"></span><input id="search-input" type="search" placeholder="요소 검색" aria-label="요소 검색" /></div>
+          <div id="search-results" aria-live="polite"></div>
+          <p class="layers-hint">위에 있는 요소가 앞에 표시됩니다.</p>
+          <div id="layers-list" aria-label="보드 요소 목록"></div>
+        </div>
+        <div class="inspector-footnote"><span data-icon="lock" data-size="13"></span>내 자료는 이 기기에만 보관됩니다.</div>
+      </aside>
+    </div>
+
+    <footer class="statusbar"><div><span class="status-dot"></span><span id="node-count">0개 요소</span></div><span class="statusbar-hint">Space 이동 <span>·</span> 휠 확대/축소 <span>·</span> 더블클릭 편집</span><button data-action="help" aria-label="사용법 및 단축키">단축키 <kbd>?</kbd></button></footer>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <div id="context-menu" class="dropdown context-menu" role="menu" hidden></div>
+  <dialog id="help-dialog" aria-labelledby="help-title">
+    <div class="dialog-heading"><div><h1 id="help-title">종이처럼 편하게, 도구처럼 정확하게.</h1><p>AgentSketch 사용법과 단축키</p></div><form method="dialog"><button class="icon-button" aria-label="도움말 닫기" title="닫기"><span data-icon="close"></span></button></form></div>
+    <div class="help-intro"><span data-icon="image" data-size="24"></span><p>PPT나 업무 화면을 캡처해 <strong>Ctrl+V</strong>로 붙여넣으세요.<br />이미지를 잠그고, 그 위에 도형과 설명을 올릴 수 있습니다.</p></div>
+    <div class="help-columns">
+      <section><h2>작업지와 요소</h2><dl><dt>선택 / 화면 이동</dt><dd><kbd>V</kbd><kbd>H</kbd></dd><dt>화면을 잠시 이동</dt><dd><kbd>Space + 드래그</kbd></dd><dt>확대 / 축소</dt><dd><kbd>휠</kbd></dd><dt>전체 보기</dt><dd><kbd>Ctrl + 0</kbd></dd><dt>여러 요소 선택</dt><dd><kbd>Shift + 클릭</kbd></dd><dt>모두 선택</dt><dd><kbd>Ctrl + A</kbd></dd><dt>내용 편집</dt><dd><kbd>더블클릭</kbd></dd><dt>선택 해제 / 취소</dt><dd><kbd>Esc</kbd></dd></dl></section>
+      <section><h2>편집과 저장</h2><dl><dt>복사 / 붙여넣기</dt><dd><kbd>Ctrl + C / V</kbd></dd><dt>복제</dt><dd><kbd>Ctrl + D</kbd></dd><dt>실행 취소 / 다시 실행</dt><dd><kbd>Ctrl + Z / Shift Z</kbd></dd><dt>그룹 / 그룹 풀기</dt><dd><kbd>Ctrl + G / Shift G</kbd></dd><dt>정밀 이동 / 크게 이동</dt><dd><kbd>방향키 / Shift</kbd></dd><dt>삭제</dt><dd><kbd>Delete</kbd></dd><dt>저장 / 열기</dt><dd><kbd>Ctrl + S / O</kbd></dd><dt>다른 이름으로 저장</dt><dd><kbd>Ctrl + Shift + S</kbd></dd></dl></section>
+    </div>
+    <div class="help-note"><strong>연결선 만들기</strong><p>연결 도구를 선택한 뒤 시작 요소와 도착 요소를 차례로 클릭하세요. 연결선도 선택해서 설명, 선 모양, 화살표를 바꿀 수 있습니다.</p></div>
+    <div class="dialog-footer"><span>이미지는 보드 파일 안에 함께 저장됩니다.</span><form method="dialog"><button class="primary-button">이제 그려볼게요</button></form></div>
+  </dialog>
+  <script type="module" src="/src/icons.ts"></script>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

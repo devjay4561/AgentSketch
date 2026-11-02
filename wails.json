@@ -1,0 +1,13 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "AgentSketch",
+  "outputfilename": "AgentSketch",
+  "frontend:dir": ".",
+  "frontend:install": "npm ci",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "wailsjsdir": ".",
+  "author": { "name": "AgentSketch", "email": "" },
+  "info": { "companyName": "AgentSketch", "productName": "AgentSketch", "productVersion": "0.1.0", "copyright": "Copyright (c) 2026 AgentSketch contributors. MIT License.", "comments": "오프라인 플로우차트 편집기" }
+}

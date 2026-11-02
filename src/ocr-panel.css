@@ -1,0 +1,14 @@
+.ocr-panel { color: var(--ink); max-width: 820px; }
+.ocr-source p, .ocr-help { color: var(--muted); font-size: var(--fs-label); line-height: 1.6; margin: 0; max-width: 72ch; }
+.ocr-source { display: grid; gap: 6px; margin: 0 0 24px; }
+.ocr-source strong { font-size: var(--fs-section); font-weight: 650; overflow-wrap: anywhere; }
+.ocr-field-label { font-size: var(--fs-label); font-weight: 550; color: var(--label); }
+.ocr-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.ocr-local { font-size: var(--fs-label); color: var(--muted); }
+.ocr-status { min-height: 22px; line-height: 1.6; font-size: var(--fs-label); color: var(--muted); margin: 16px 0; overflow-wrap: anywhere; }
+.ocr-status.ocr-error { color: var(--danger); }
+.ocr-result { display: grid; gap: 6px; font-size: var(--fs-label); font-weight: 550; color: var(--label); }
+.ocr-result textarea { display: block; box-sizing: border-box; width: 100%; min-height: 220px; max-height: 460px; resize: vertical; font-weight: 400; }
+.ocr-help { margin: 12px 0 22px; }
+.ocr-panel button:disabled { cursor: not-allowed; opacity: .55; }
+.ocr-panel button:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; }

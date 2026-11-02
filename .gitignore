@@ -1,0 +1,31 @@
+# dependencies / build output
+node_modules/
+dist/
+build/bin/
+wailsjs/
+.tools/
+release/
+output/
+*.log
+
+# local tooling and personal workspace state
+.gjc/
+.playwright/*
+!.playwright/cli.config.json
+.claude/
+.codex/
+documents/
+skills/agentsketch/locations.json
+*.lnk
+여기서 시작.md
+
+# OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# design tooling state (local)
+.impeccable/

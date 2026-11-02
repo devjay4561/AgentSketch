@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm-dev:
+        dependency-type: development
+      npm-prod:
+        dependency-type: production
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      # Replaced by the pinned local patch in third_party/go-webview2; upgrade together with Wails by hand.
+      - dependency-name: github.com/wailsapp/go-webview2
+      - dependency-name: github.com/wailsapp/wails/v2
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

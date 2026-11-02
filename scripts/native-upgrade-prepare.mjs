@@ -1,0 +1,15 @@
+import {writeFile,mkdir,readFile} from 'node:fs/promises';
+import path from 'node:path';
+import {createNode,emptyDocument} from '../src/model.ts';
+const dir=path.resolve('output/native-upgrade-data');await mkdir(path.join(dir,'AgentSketch'),{recursive:true});
+const doc=emptyDocument();doc.title='네이티브 통합 검사';doc.workspace={pages:[{id:'page-main',name:'기본 페이지'}],activePageId:'page-main'};
+const resource=createNode('rect',100,160),step=createNode('rect',500,160);resource.text='판매량 자료';resource.details={role:'resource',owner:'운영팀',status:'verified',version:'v1',verifiedVersion:'v1',checkedBy:'검사',checkedAt:new Date().toISOString(),source:path.join(dir,'source.txt')};step.text='월간보고';step.details={role:'step',requirement:'all'};
+doc.nodes=[resource,step];doc.edges=[{id:'edge-native',from:resource.id,to:step.id,fromPort:'right',toPort:'left',style:'elbow',color:'#67768a',width:2,label:'확인 후 진행',arrow:'end',dashed:false,relation:'required',waypoints:[{x:400,y:100}]}];
+resource.details.customFields={'보고주기':'정기'};resource.details.attachmentIds=['native-attachment'];
+resource.groupId='native-group';step.groupId='native-group';
+doc.workspace.groups=[{id:'native-group',name:'자료 준비',description:'보존 검사'}];
+const attachment=Buffer.from('검증용 첨부','utf8');doc.workspace.attachments=[{id:'native-attachment',name:'자료.txt',mime:'text/plain',size:attachment.length,data:attachment.toString('base64')}];
+doc.edges[0].condition={nodeId:resource.id,field:'보고주기',operator:'equals',value:'정기'};doc.edges[0].labelBackground='#FFF0E5';doc.edges[0].labelAngle=90;
+await writeFile(path.join(dir,'source.txt'),'판매량 검증 자료','utf8');await writeFile(path.join(dir,'launch.agentsketch'),JSON.stringify(doc));
+const next=structuredClone(doc);next.title='두 번째 실행으로 연 문서';await writeFile(path.join(dir,'second.agentsketch'),JSON.stringify(next));
+await writeFile(path.join(dir,'AgentSketch/recovery.agentsketch'),JSON.stringify(doc));
