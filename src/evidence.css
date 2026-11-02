@@ -1,0 +1,66 @@
+.evidence-panel { color: var(--ink); min-width: 0; }
+.evidence-panel h2 { margin: 0; font-size: var(--fs-title); font-weight: 700; letter-spacing: -.4px; }
+.evidence-panel h3 { margin: 0; }
+.evidence-panel h4 { margin: 20px 0 8px; font-size: var(--fs-body); font-weight: 650; }
+.evidence-view-switch { display: flex; gap: 8px; margin-bottom: 14px; }
+.evidence-panel .evidence-view-switch [aria-pressed=true] { color: var(--accent-text); background: var(--accent-soft); border-color: #efc6aa; font-weight: 650; }
+.evidence-panel .evidence-report-option { flex-direction: row; align-items: center; margin: 10px 0; }
+.evidence-panel .evidence-watch-toggle { flex-direction: row; align-items: center; margin: 12px 0; }
+.evidence-panel [hidden] { display: none !important; }
+.evidence-report-row { padding: 18px 0; }
+.evidence-panel .evidence-report-row button { border: 0; padding: 0; text-align: left; font-weight: 650; background: none; }
+.evidence-report-row dl { display: grid; grid-template-columns: 88px minmax(0,1fr); gap: 6px 10px; margin: 12px 0 0; font-size: var(--fs-label); }
+.evidence-report-row dt { color: var(--muted); }
+.evidence-report-row dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.evidence-panel [data-evidence-trace] { margin-top: 28px; }
+.evidence-note,.evidence-list-note { margin: 6px 0 0; color: var(--muted); font-size: var(--fs-label); line-height: 1.6; overflow-wrap: anywhere; }
+.evidence-summary { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 10px 14px; border-radius: 8px; background: var(--surface); color: var(--muted); font-size: var(--fs-label); font-variant-numeric: tabular-nums; }
+.evidence-summary strong { color: var(--ink); margin-left: 4px; font-weight: 650; }
+.evidence-toolbar { display: flex; align-items: end; gap: 10px; margin: 16px 0 10px; }
+.evidence-search { flex: 1; }
+.evidence-panel label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.evidence-panel label>span { font-size: var(--fs-label); font-weight: 550; color: var(--label); }
+.evidence-panel input:not([type=checkbox]),.evidence-panel select,.evidence-panel textarea { box-sizing: border-box; width: 100%; min-width: 0; }
+.evidence-panel input[type=checkbox] { flex-shrink: 0; margin: 2px 0; }
+.evidence-panel textarea { resize: vertical; min-height: 76px; }
+.evidence-panel button { min-height: var(--button-h); padding: 0 12px; border: 0; border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; font-size: var(--fs-body); font-weight: 550; cursor: pointer; }
+.evidence-panel button:hover { background: var(--hover); }
+.evidence-panel button:disabled,.evidence-panel fieldset:disabled { opacity: .6; cursor: default; }
+.evidence-list { max-height: 270px; overflow: auto; scrollbar-color: #c4cbd3 transparent; scrollbar-width: thin; }
+.evidence-panel .evidence-record { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; text-align: left; border: 0; border-radius: 6px; padding: 10px; font-weight: 400; }
+.evidence-panel .evidence-record.is-selected { background: var(--accent-soft); }
+.evidence-record-name { min-width: 0; overflow-wrap: anywhere; font-weight: 550; }
+.evidence-record-name small { display: block; margin-top: 2px; font-weight: 400; color: var(--muted); font-size: var(--fs-meta); }
+.evidence-status { flex-shrink: 0; color: var(--muted); font-size: var(--fs-meta); white-space: nowrap; }
+.evidence-status[data-state=ready] { color: #24663b; }
+.evidence-status[data-state=blocked],.evidence-status[data-state=stale] { color: #a3440c; }
+.evidence-status[data-state=cycle] { color: #b42332; }
+.evidence-selection { margin-top: 36px; }
+.evidence-editor-title { display: flex; gap: 12px; align-items: baseline; justify-content: space-between; }
+.evidence-editor-title h3 { overflow-wrap: anywhere; }
+.evidence-panel fieldset { padding: 0; border: 0; margin: 20px 0 0; min-width: 0; }
+.evidence-panel legend { margin-bottom: 12px; padding: 0; }
+.evidence-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px 12px; margin: 14px 0; }
+.evidence-wide { grid-column: 1/-1; }
+.evidence-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.evidence-panel .evidence-primary { background: var(--accent); border-color: var(--accent); color: var(--ink); font-weight: 650; width: 100%; min-height: 38px; margin-top: 6px; }
+.evidence-panel .evidence-primary:hover { background: var(--accent-hover); }
+.evidence-notes { margin-top: 20px; }
+.evidence-checklist { margin-top: 20px; }
+.evidence-check-row { display: flex; align-items: start; justify-content: space-between; gap: 10px; padding: 7px 0; }
+.evidence-check-row label { flex-direction: row; align-items: start; gap: 8px; }
+.evidence-check-row label>span { color: var(--ink); font-size: var(--fs-body); font-weight: 400; overflow-wrap: anywhere; }
+.evidence-panel .evidence-check-row button { border: 0; min-height: 24px; color: var(--muted); font-size: var(--fs-meta); padding: 0 6px; }
+.evidence-add-check { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.evidence-add-check button { flex-shrink: 0; }
+.evidence-custom-row { display: flex; align-items: end; gap: 8px; margin-top: 10px; }
+.evidence-custom-row label { flex: 1; }
+.evidence-custom-row button { flex-shrink: 0; }
+.evidence-review { margin-top: 28px; }
+.evidence-review summary { cursor: pointer; }
+.evidence-panel .evidence-text-link { display: block; width: 100%; padding: 9px 0; border: 0; border-radius: 0; text-align: left; background: transparent; overflow-wrap: anywhere; min-height: 0; font-weight: 400; }
+.evidence-text-link small { display: block; color: var(--muted); margin-top: 2px; font-size: var(--fs-meta); }
+.evidence-empty { padding: 18px 6px; color: var(--muted); font-size: var(--fs-label); }
+.evidence-empty h3 { color: var(--ink); }
+.evidence-connection { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); overflow-wrap: anywhere; font-size: var(--fs-label); margin: 10px 0 16px; }
+@media (max-width: 1040px) { .evidence-toolbar { align-items: stretch; flex-direction: column; } }

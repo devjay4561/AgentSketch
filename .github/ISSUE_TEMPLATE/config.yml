@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 보안 취약점 제보
+    url: https://github.com/devjay4561/AgentSketch/security/advisories/new
+    about: 취약점은 공개 이슈 대신 비공개로 제보해 주세요.
+  - name: 💬 질문과 아이디어
+    url: https://github.com/devjay4561/AgentSketch/discussions
+    about: 사용법 질문과 자유로운 논의는 Discussions를 이용해 주세요.

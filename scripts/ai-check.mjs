@@ -1,0 +1,41 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {spawn} from 'node:child_process';
+import {createInterface} from 'node:readline';
+import {execute} from '../ai/runtime.mjs';
+const root=path.resolve('output/ai-test');await fs.mkdir(root,{recursive:true});
+process.env.APPDATA=path.join(root,'profile');
+const file='test.agentsketch',target={file},checks=[];
+await fs.rm(path.join(root,file),{force:true});
+const run=request=>execute({...request,target},{root});
+const initial=await run({commands:[{command:'document.new',args:{title:'월간보고 AI 검증'}},{command:'node.add',args:{id:'source',kind:'round',x:0,y:0,props:{text:'선행 자료',details:{role:'resource',source:'source.csv',version:'1'}}}},{command:'node.add',args:{id:'report',kind:'round',x:400,y:0,props:{text:'월간보고',fill:'#FFF1E8'}}},{command:'edge.add',args:{id:'e1',from:'source',to:'report',props:{relation:'required'}}}]});
+assert.equal(initial.mutates,true);checks.push('atomic-create');
+const bytes=await fs.readFile(path.join(root,file),'utf8');
+await assert.rejects(run({commands:[{command:'document.rename',args:{title:'실패'}},{command:'node.update',args:{ids:['absent'],props:{text:'실패'}}}]}));assert.equal(await fs.readFile(path.join(root,file),'utf8'),bytes);checks.push('rollback');
+await run({command:'document.rename',args:{title:'dry'},dryRun:true});assert.equal(await fs.readFile(path.join(root,file),'utf8'),bytes);checks.push('dry-run');
+await assert.rejects(run({command:'document.rename',args:{title:'bad'},expectedRevision:'stale'}),e=>e.code==='REVISION_CONFLICT');checks.push('revision-conflict');
+await assert.rejects(execute({target:{file:'../outside.agentsketch'},command:'document.new'},{root}),e=>e.code==='OUTSIDE_ROOT');checks.push('root-boundary');
+await run({command:'node.update',args:{ids:['source'],props:{locked:true}}});await assert.rejects(run({command:'node.move',args:{ids:['source'],dx:1,dy:1}}),e=>e.code==='LOCKED');await run({command:'node.update',args:{ids:['source'],props:{locked:false}}});checks.push('lock');
+await fs.mkdir(path.join(process.env.APPDATA,'AgentSketch'),{recursive:true});await fs.writeFile(path.join(process.env.APPDATA,'AgentSketch/open-documents.json'),JSON.stringify({pid:process.pid,paths:[path.join(root,file)]}));
+await assert.rejects(run({command:'document.rename',args:{title:'open'}}),e=>e.code==='DOCUMENT_OPEN');await fs.unlink(path.join(process.env.APPDATA,'AgentSketch/open-documents.json'));checks.push('open-document-protection');
+for(const format of ['png','svg','pdf','pptx','html','csv','drawio','agentsketch']){const result=await run({command:'document.export',args:{format},output:'export.'+format,overwrite:true});assert.ok(result.bytes>50,format);checks.push('export-'+format);}
+assert.equal((await fs.readFile(path.join(root,'export.png'))).subarray(1,4).toString(),'PNG');
+assert.equal((await fs.readFile(path.join(root,'export.pdf'))).subarray(0,4).toString(),'%PDF');
+assert.equal((await fs.readFile(path.join(root,'export.pptx'))).subarray(0,2).toString(),'PK');
+await run({command:'image.import',args:{path:'export.png',at:{x:100,y:350}}});checks.push('image-import');
+await run({command:'text.fit',args:{ids:['report']}});checks.push('text-fit');
+await execute({target:{file:'imported.agentsketch'},command:'document.import',args:{path:'export.drawio',format:'drawio'}},{root});checks.push('drawio-import');
+const child=spawn(process.execPath,['ai/cli.mjs','mcp','--root',root],{stdio:['pipe','pipe','pipe'],windowsHide:true});let seq=0;const pending=new Map();let stderr='';child.stderr.on('data',v=>stderr+=v);
+createInterface({input:child.stdout}).on('line',line=>{const msg=JSON.parse(line);pending.get(msg.id)?.(msg);pending.delete(msg.id);});
+const rpc=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq,timer=setTimeout(()=>reject(Error('RPC timeout '+method)),60000);pending.set(id,v=>{clearTimeout(timer);resolve(v);});child.stdin.write(JSON.stringify({jsonrpc:'2.0',id,method,params})+'\n');});
+try{
+ assert.equal((await rpc('initialize',{protocolVersion:'2025-11-25',capabilities:{},clientInfo:{name:'test',version:'1'}})).result.protocolVersion,'2025-11-25');
+ child.stdin.write(JSON.stringify({jsonrpc:'2.0',method:'notifications/initialized'})+'\n');
+ assert.equal((await rpc('tools/list')).result.tools.length,4);
+ const read=await rpc('tools/call',{name:'agentsketch_execute',arguments:{request:{target,command:'document.read'}}});assert.ok(read.result.structuredContent.revision);checks.push('mcp-read');
+ const error=await rpc('tools/call',{name:'agentsketch_execute',arguments:{request:{target,command:'bad'}}});assert.equal(error.result.isError,true);checks.push('mcp-error');
+ const preview=await rpc('tools/call',{name:'agentsketch_preview',arguments:{target,scale:.5}});assert.equal(preview.result.content[0].type,'image');assert.equal(preview.result.content[0].mimeType,'image/png');checks.push('mcp-image-preview');
+ await Promise.all([rpc('ping'),rpc('tools/list')]);checks.push('mcp-concurrent');
+}finally{child.stdin.end();await new Promise(resolve=>child.on('exit',resolve));}
+assert.equal(stderr,'');await fs.writeFile(path.join(root,'results.json'),JSON.stringify({passed:checks.length,checks},null,2));console.log(JSON.stringify({passed:checks.length,checks}));

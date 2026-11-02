@@ -1,0 +1,27 @@
+name: ✨ 기능 제안
+description: 새 기능이나 개선 아이디어를 제안해 주세요.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 해결하고 싶은 문제
+      description: 어떤 작업에서 무엇이 불편한가요?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 제안하는 방법
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 고려한 대안
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: 확인
+      options:
+        - label: 오프라인·로컬 우선 원칙과 충돌하지 않거나, 충돌한다면 사용자가 켤 때만 동작하는 방식을 제안했습니다.

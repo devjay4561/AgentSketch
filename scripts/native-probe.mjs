@@ -1,0 +1,22 @@
+import { chromium } from 'playwright';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+const browser = await chromium.connectOverCDP('http://127.0.0.1:9227');
+const context = browser.contexts()[0], pages = context.pages();
+const page = pages.find(p => p.url().includes('wails.localhost'));
+if (!page) throw new Error('Native Wails page missing');
+const result = await page.evaluate(async (outputPath) => {
+  const app = window.go?.main?.App;
+  if (!app) throw new Error('Native bridge unavailable');
+  const raw = await app.LoadAutosave();
+  const doc = JSON.parse(raw);
+  const saved = await app.SaveDocument(raw, outputPath, false);
+  window.runtime.WindowShow();
+  return { title: document.title, documentTitle: doc.title, nodes: doc.nodes.length, edges: doc.edges.length, path: saved, nativeMethods: Object.keys(app) };
+}, path.resolve('output/native-roundtrip.agentsketch'));
+const onDisk=JSON.parse(await fs.readFile(result.path,'utf8'));
+if(onDisk.title!==result.documentTitle||onDisk.nodes.length!==result.nodes) throw new Error('Native disk roundtrip mismatch');
+await page.screenshot({path:'output/playwright/native.png'});
+await fs.writeFile('output/native-probe.json',JSON.stringify(result,null,2));
+console.log(JSON.stringify(result,null,2));
+await browser.close();

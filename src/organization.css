@@ -1,0 +1,33 @@
+.organization-panel { color: var(--ink); min-width: 0; }
+.organization-panel .org-help { color: var(--muted); font-size: var(--fs-label); line-height: 1.6; margin: 0; }
+.organization-panel .org-section { padding: 0 0 36px; }
+.organization-panel .org-section h3 { margin: 0 0 4px; }
+.organization-panel .org-section-body { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.organization-panel .org-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-size: var(--fs-label); font-weight: 550; color: var(--label); }
+.organization-panel input, .organization-panel select, .organization-panel textarea { min-width: 0; width: 100%; box-sizing: border-box; }
+.organization-panel textarea { resize: vertical; }
+.organization-panel select { cursor: pointer; }
+.organization-panel .org-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.organization-panel .org-button { min-height: var(--button-h); padding: 0 12px; border: 0; border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; font-size: var(--fs-body); font-weight: 550; cursor: pointer; line-height: 1.3; }
+.organization-panel .org-button:hover:not(:disabled) { background: var(--hover); }
+.organization-panel .org-button.org-primary { background: var(--accent); border-color: var(--accent); color: var(--ink); font-weight: 650; }
+.organization-panel .org-button.org-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.organization-panel .org-button[aria-pressed="true"] { color: var(--accent-text); background: var(--accent-soft); border-color: #efc6aa; }
+.organization-panel :is(button,input,select):disabled { cursor: not-allowed; opacity: .5; }
+.organization-panel .org-empty { color: var(--muted); font-size: var(--fs-label); line-height: 1.6; margin: 4px 0; }
+.organization-panel .org-error { color: var(--danger); background: var(--danger-soft); font-size: var(--fs-label); padding: 12px; border-radius: 6px; line-height: 1.65; margin: 0; }
+.organization-panel .org-layer-row, .organization-panel .org-bookmark { display: flex; flex-direction: column; gap: 9px; padding: 12px 0; }
+.organization-panel .org-scale { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+.organization-panel .org-scale label { display: flex; align-items: center; gap: 7px; font-size: var(--fs-label); font-weight: 550; color: var(--label); }
+.organization-panel .org-scale input { width: 75px; font-variant-numeric: tabular-nums; }
+.organization-panel .org-library-item { display: flex; flex-direction: column; gap: 9px; padding: 12px 0; }
+.organization-panel .org-library-item strong { font-weight: 600; overflow-wrap: anywhere; }
+.organization-panel .org-tree { background: var(--canvas); border-radius: 6px; max-height: 280px; overflow: auto; padding: 5px; }
+.organization-panel .org-tree-label { display: flex; align-items: center; gap: 5px; min-height: 34px; padding-right: 7px; cursor: pointer; border-radius: 4px; }
+.organization-panel .org-tree-label:hover { background: var(--surface); }
+.organization-panel .org-tree-item[aria-selected="true"] > .org-tree-label { background: var(--accent-soft); color: var(--accent-text); }
+.organization-panel .org-tree-item:focus-visible { outline: none; }
+.organization-panel .org-tree-item:focus-visible > .org-tree-label { outline: 2px solid var(--accent-text); outline-offset: -2px; }
+.organization-panel .org-tree-toggle { display: flex; align-items: center; justify-content: center; width: 24px; height: 26px; border: 0; background: transparent; color: inherit; cursor: pointer; flex: 0 0 24px; }
+.organization-panel .org-tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.organization-panel .org-tree-member-mark { width: 24px; flex: 0 0 24px; }

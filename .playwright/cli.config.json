@@ -1,0 +1,8 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "launchOptions": { "channel": "msedge", "headless": true, "args": ["--disable-features=AutofillAiWalletPrivatePasses"] },
+    "contextOptions": { "viewport": { "width": 1440, "height": 900 }, "deviceScaleFactor": 1 }
+  },
+  "outputDir": "output/playwright"
+}

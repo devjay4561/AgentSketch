@@ -1,0 +1,22 @@
+.layout-workbench { color: var(--ink); font: inherit; }
+.layout-note,.layout-status { margin: 0 0 20px; color: var(--muted); font-size: var(--fs-label); line-height: 1.6; }
+.layout-field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 16px; font-size: var(--fs-label); font-weight: 550; color: var(--label); min-width: 0; }
+.layout-field select,.layout-field input { width: 100%; box-sizing: border-box; }
+.layout-fields { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; }
+.layout-unit { font-size: var(--fs-meta); font-weight: 400; color: var(--muted); }
+.layout-check { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0; font-size: var(--fs-body); line-height: 1.5; }
+.layout-check input { margin-top: 3px; }
+.layout-note { margin-top: 16px; }
+.layout-workbench button { min-height: var(--button-h); font: inherit; font-size: var(--fs-body); font-weight: 550; border: 0; border-radius: 6px; padding: 0 14px; cursor: pointer; background: var(--surface); color: var(--ink); }
+.layout-workbench button:hover { background: var(--hover); }
+.layout-workbench button:disabled { opacity: .5; cursor: default; }
+.layout-workbench .layout-preview-button { width: 100%; min-height: 38px; background: var(--accent); border-color: var(--accent); color: var(--ink); font-weight: 650; }
+.layout-workbench .layout-preview-button:hover { background: var(--accent-hover); }
+.layout-result { margin-top: 20px; }
+.layout-preview { display: block; width: 100%; height: auto; border-radius: 8px; }
+.layout-summary { font-size: var(--fs-body); font-weight: 600; font-variant-numeric: tabular-nums; margin: 12px 0 8px; }
+.layout-warnings { margin: 0 0 16px; padding-left: 18px; color: var(--muted); font-size: var(--fs-label); line-height: 1.6; }
+.layout-actions { display: flex; gap: 8px; }
+.layout-workbench .layout-actions button:first-child { background: var(--accent); border-color: var(--accent); font-weight: 650; flex: 1; }
+.layout-workbench .layout-actions button:first-child:hover { background: var(--accent-hover); }
+.layout-status { margin: 14px 0 0; }

@@ -1,0 +1,22 @@
+.interchange-panel { color: var(--ink); }
+.exchange-section p { margin:0 0 12px; color: var(--muted); font-size: var(--fs-label); line-height: 1.6; }
+.exchange-section { padding:0 0 36px; }
+.exchange-section h3 { margin:0 0 12px; }
+.exchange-fields { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.exchange-fields label { display:flex; flex-direction:column; gap:6px; font-size: var(--fs-label); font-weight: 550; color: var(--label); }
+.exchange-fields select,.exchange-fields input[type=number] { width:100%; }
+.exchange-print-hint { grid-column:1/-1; font-size:var(--fs-meta); margin:0!important; }
+.exchange-scope-note { font-size:var(--fs-label); color:var(--accent-text)!important; margin:8px 0 0!important; }
+.exchange-scope-note:empty { display:none; }
+.exchange-fields .exchange-check { flex-direction:row; align-items:center; grid-column:1/-1; font-size:var(--fs-body); font-weight:400; color:var(--ink); }
+.exchange-section button { width:100%; display:flex; flex-direction:column; align-items:flex-start; padding:10px 12px; margin:6px 0; border:0; border-radius:8px; color:var(--ink); background:var(--surface); font:inherit; text-align:left; cursor:pointer; }
+.exchange-section button strong { font-size:var(--fs-body); font-weight:600; }
+.exchange-section button span { font-size:var(--fs-label); color:var(--muted); margin-top:2px; }
+.exchange-section button:hover { background:var(--hover); }
+.exchange-section button:disabled { opacity:.5; cursor:progress; }
+.exchange-section input[type=file] { max-width:100%; font:inherit; font-size:var(--fs-label); color:var(--muted); }
+.exchange-import button { background:var(--accent); border-color:var(--accent); }
+.exchange-import button:hover { background:var(--accent-hover); border-color:var(--accent-hover); }
+.exchange-result { white-space:pre-wrap; overflow-wrap:anywhere; font-size:var(--fs-label); color:var(--accent-text); padding:12px 0; }
+.exchange-count { margin:10px 0 0!important; font-size:var(--fs-label); font-variant-numeric:tabular-nums; }
+.exchange-section input[type=file]::file-selector-button { font:inherit; font-size:var(--fs-body); font-weight:550; min-height:var(--button-h); padding:0 12px; border: 0; border-radius: 6px; background: var(--surface); color:var(--ink); cursor:pointer; margin-right:10px; }

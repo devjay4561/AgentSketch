@@ -1,0 +1,17 @@
+* text=auto
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.nsi text eol=crlf
+*.sh text eol=lf
+
+*.png binary
+*.ico binary
+*.ttf binary
+*.woff2 binary
+*.exe binary
+*.zip binary
+
+third_party/** linguist-vendored
+public/fonts/** linguist-vendored
+package-lock.json linguist-generated
+go.sum linguist-generated

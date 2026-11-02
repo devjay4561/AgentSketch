@@ -1,0 +1,22 @@
+.canvas-tools { color: var(--ink); min-width: 0; }
+.canvas-tools h2 { margin: 0 0 4px; font-size: var(--fs-section); font-weight: 650; letter-spacing: -.15px; }
+.canvas-tools .ct-lead { margin: 0 0 18px; color: var(--muted); font-size: var(--fs-label); line-height: 1.6; }
+.canvas-tools section { padding: 12px 0 24px; }
+.canvas-tools h3 { margin: 0 0 12px; }
+.canvas-tools h3 span { color: var(--accent-text); margin-left: 5px; font-variant-numeric: tabular-nums; }
+.canvas-tools label { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; font-size: var(--fs-label); font-weight: 550; color: var(--label); }
+.canvas-tools input:not([type=range]), .canvas-tools select { width: 100%; min-width: 0; box-sizing: border-box; font-variant-numeric: tabular-nums; }
+.canvas-tools input[type=range] { width: 100%; }
+.canvas-tools button { min-height: var(--button-h); padding: 0 12px; border: 0; border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; font-size: var(--fs-body); font-weight: 550; cursor: pointer; }
+.canvas-tools button:hover:not(:disabled) { background: var(--hover); }
+.canvas-tools button:disabled { cursor: default; opacity: .5; }
+.canvas-tools .ct-actions { display: flex; flex-wrap: wrap; gap: 7px; margin: 8px 0; }
+.canvas-tools .ct-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.canvas-tools .ct-help { color: var(--muted); font-size: var(--fs-label); line-height: 1.6; margin: 10px 0 0; }
+.canvas-tools .ct-waypoints { list-style: none; margin: 12px 0; padding: 0; }
+.canvas-tools .ct-waypoints li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; font-variant-numeric: tabular-nums; }
+.canvas-tools .ct-waypoints button { min-height: 28px; padding: 0 9px; font-size: var(--fs-label); }
+.canvas-tools textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 90px; }
+.canvas-tools .ct-rich { padding: 12px 0 24px; } .canvas-tools .ct-rich summary { cursor: pointer; font-size: 13px; font-weight: 650; color: #39434f; padding: 3px 0; } .canvas-tools .ct-rich summary:focus-visible { outline: 2px solid #c2410c; outline-offset: 3px; } .canvas-tools .ct-rich[open] summary { margin-bottom: 16px; color: #a83c0c; }
+.canvas-tools .ct-defaults { padding: 8px 0 16px; } .canvas-tools .ct-defaults summary { cursor: pointer; font-size: 13px; font-weight: 650; color: #39434f; padding: 3px 0; } .canvas-tools .ct-defaults summary:focus-visible { outline: 2px solid #c2410c; outline-offset: 3px; }
+.canvas-tools .ct-segments { padding: 12px 0 24px; } .canvas-tools .ct-segments summary { cursor: pointer; font-size: 13px; font-weight: 650; color: #39434f; padding: 3px 0; } .canvas-tools .ct-segments summary:focus-visible { outline: 2px solid #c2410c; outline-offset: 3px; }
