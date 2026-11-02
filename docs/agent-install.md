@@ -56,9 +56,6 @@ New-Item -ItemType Directory -Force $root | Out-Null
 Test-Path $cli, (Join-Path $app 'AgentSketch.exe')         # both must be True
 ```
 
-`AI\mcp-config.json` in the zip contains example paths from the build machine. Ignore it and use
-`$cli` and `$root` from this step.
-
 ## 4. Register the MCP server
 
 Use the server name `agentsketch`. Register only the hosts the user chose.

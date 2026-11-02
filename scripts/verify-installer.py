@@ -35,7 +35,7 @@ assert (root / '.tools/AgentSketch-Rollback.exe').read_bytes() in payload
 assert (root / 'scripts/NSIS-LICENSE.txt').read_bytes() in payload
 included = ['AgentSketch.exe', 'AgentSketch-Rollback.exe', 'Uninstall.exe']
 included.append('NSIS-LICENSE.txt')
-for name in ['사용안내.md', '검증결과.md', '업그레이드범위.md', 'THIRD-PARTY-NOTICES.txt', 'AI-사용안내.md', 'agentsketch.cmd']:
+for name in ['THIRD-PARTY-NOTICES.txt', 'agentsketch.cmd']:
     expected = (source / name).read_bytes()
     assert expected in payload, f'Bundled {name} differs from final package'
     assert name.encode('utf-16-le') in payload, f'Unicode filename missing: {name}'

@@ -32,4 +32,4 @@ live 변경은 target을 `{"live":true}`로 바꾸고 직전 읽기의 `revision
 
 출력 파일이 이미 있으면 `overwrite:true`를 명시한다. 파일 수정은 교체 직전 원본 해시 재확인·임시 파일·백업을 사용한다. dryRun은 문서 명령에서만 쓰며 파일 저장은 하지 않는다.
 
-MCP stdio 설정은 배포 폴더의 `AI/mcp-config.json`을 참고한다. `args`의 CLI 경로와 `--root`는 실제 위치에 맞춘다. `agentsketch_preview`는 모델이 직접 볼 수 있는 PNG 이미지 블록을 반환한다. MCP 서버는 호스트가 필요할 때 실행하고, CLI 일반 명령은 작업 후 종료한다.
+MCP 등록은 저장소의 `docs/agent-install.md`를 따른다. `args`에는 실제 설치 위치의 `AI/ai/cli.mjs`와 사용자가 정한 `--root`를 넣는다. `agentsketch_preview`는 모델이 직접 볼 수 있는 PNG 이미지 블록을 반환한다. MCP 서버는 호스트가 필요할 때 실행하고, CLI 일반 명령은 작업 후 종료한다.

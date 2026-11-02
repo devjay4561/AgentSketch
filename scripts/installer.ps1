@@ -31,7 +31,7 @@ if (-not (Test-Path -LiteralPath $compiler)) {
 }
 if (-not $SourceDirectory) { $SourceDirectory = Join-Path $projectRoot 'release/AgentSketch' }
 $source = (Resolve-Path -LiteralPath $SourceDirectory).Path
-foreach ($file in @('AgentSketch.exe','사용안내.md','검증결과.md','업그레이드범위.md','THIRD-PARTY-NOTICES.txt')) {
+foreach ($file in @('AgentSketch.exe','THIRD-PARTY-NOTICES.txt','agentsketch.cmd')) {
     if (-not (Test-Path -LiteralPath (Join-Path $source $file))) { throw "설치 원본 누락: $file. 먼저 package.ps1을 실행하세요." }
 }
 $builtExecutable = Join-Path $projectRoot 'build/bin/AgentSketch.exe'

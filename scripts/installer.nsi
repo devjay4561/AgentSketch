@@ -108,11 +108,7 @@ Section "AgentSketch 프로그램 (필수)" Main
     Abort
   ${EndIf}
   Delete "$INSTDIR\AgentSketch.replacing.exe"
-  File "${SOURCE}\사용안내.md"
-  File "${SOURCE}\검증결과.md"
-  File "${SOURCE}\업그레이드범위.md"
   File "${SOURCE}\THIRD-PARTY-NOTICES.txt"
-  File "${SOURCE}\AI-사용안내.md"
   File "${SOURCE}\agentsketch.cmd"
   File /r "${SOURCE}\AI"
   File "NSIS-LICENSE.txt"

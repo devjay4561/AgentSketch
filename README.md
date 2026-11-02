@@ -95,7 +95,7 @@ agentsketch.cmd connect                              # 실행 중인 앱 화면�
 ```
 
 ```jsonc
-// MCP 호스트 설정 예시 (배포 폴더의 AI/mcp-config.json)
+// MCP 호스트 설정 예시 (에이전트별 등록 명령은 docs/agent-install.md)
 { "mcpServers": { "agentsketch": { "command": "node", "args": ["<배포 폴더>/AI/ai/cli.mjs", "mcp", "--root", "C:\\work"] } } }
 ```
 

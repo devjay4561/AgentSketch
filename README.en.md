@@ -98,7 +98,7 @@ agentsketch.cmd connect                              # attach to the running app
 ```
 
 ```jsonc
-// MCP host configuration (AI/mcp-config.json in the release folder)
+// MCP host configuration (per-agent commands: docs/agent-install.md)
 { "mcpServers": { "agentsketch": { "command": "node", "args": ["<release folder>/AI/ai/cli.mjs", "mcp", "--root", "C:\\work"] } } }
 ```
 
