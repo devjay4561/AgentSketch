@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {writeFile} from 'node:fs/promises';
 const browser=await chromium.launch({channel:'msedge',headless:true,args:['--disable-features=AutofillAiWalletPrivatePasses']});
 try{
- const page=await browser.newPage({viewport:{width:1200,height:920}});await page.goto(process.env.AGENTSKETCH_TEST_URL || 'http://127.0.0.1:18440');
+ const page=await browser.newPage({locale:'ko-KR',viewport:{width:1200,height:920}});await page.goto(process.env.AGENTSKETCH_TEST_URL || 'http://127.0.0.1:18440');
  await page.evaluate(async()=>{
   const {mountCanvasTools}=await import('/src/canvas-tools.ts'),{createNode,emptyDocument}=await import('/src/model.ts');
   const doc=emptyDocument(),a=createNode('rect',0,0),b=createNode('rect',400,0);a.fill='#ffbb88';a.text='선행자료';b.text='월간보고';doc.nodes=[a,b];doc.edges=[{id:'edge',from:a.id,to:b.id,fromPort:'right',toPort:'left',style:'elbow',label:'보고',color:'#222222',width:2,dashed:false,arrow:'end',waypoints:[{x:260,y:10},{x:280,y:20}]}];

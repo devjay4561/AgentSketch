@@ -5,7 +5,7 @@ await fs.mkdir('output/playwright',{recursive:true});
 await fs.writeFile('output/collab-test.html', '<!doctype html><html lang="ko"><meta charset="utf-8"><link rel="stylesheet" href="/src/style.css"><body style="padding:24px;overflow:auto;background:white"><main id="test"></main></body></html>');
 const browser=await chromium.launch({channel:'msedge',headless:true,args:['--disable-features=AutofillAiWalletPrivatePasses']});
 try{
- const page=await browser.newPage({viewport:{width:1200,height:1100}}),errors=[];page.on('pageerror',e=>errors.push(String(e)));
+ const page=await browser.newPage({locale:'ko-KR',viewport:{width:1200,height:1100}}),errors=[];page.on('pageerror',e=>errors.push(String(e)));
  await page.goto((process.env.AGENTSKETCH_TEST_URL||'http://127.0.0.1:18440')+'/output/collab-test.html');
  await page.evaluate(async()=>{
   const {mountCollaborationPanel}=await import('/src/collaboration-panel.ts');

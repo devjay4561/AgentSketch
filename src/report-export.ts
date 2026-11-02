@@ -3,8 +3,10 @@ import type { ExportOptions } from './export-binary.ts';
 import { exportDocuments } from './export-binary.ts';
 import { renderSVG } from './renderer.ts';
 import { analyzeWorkflow } from './workflow.ts';
+import {localizeHtml} from './i18n.ts';
 const escape=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
-export function renderEvidenceReport(doc:FlowDocument,options:ExportOptions={},now=new Date()):string{
+export function renderEvidenceReport(doc:FlowDocument,options:ExportOptions={},now=new Date()):string{return localizeHtml(buildEvidenceReport(doc,options,now));}
+function buildEvidenceReport(doc:FlowDocument,options:ExportOptions,now:Date):string{
  const visibleIds=new Set(doc.nodes.filter(n=>options.includeInternalNotes||n.kind!=='note').map(n=>n.id));
  const reportDoc={...doc,nodes:doc.nodes.filter(n=>visibleIds.has(n.id)),edges:doc.edges.filter(e=>visibleIds.has(e.from)&&visibleIds.has(e.to))};
  const boards=exportDocuments(reportDoc,options),analysis=analyzeWorkflow(doc,now),statusNames:Record<string,string>={ready:'준비 완료',blocked:'선행 조건 미충족',stale:'재확인 필요',cycle:'순환 조건',untracked:'추적 정보 없음'},manual:Record<string,string>={missing:'미확보',collected:'확보',reviewing:'검토 중',verified:'확인 완료',stale:'재확인 필요'};

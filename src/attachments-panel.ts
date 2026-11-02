@@ -3,6 +3,7 @@ import type { FlowDocument } from './types.ts';
 import type { WorkbenchHost, WorkspaceAttachment } from './workspace-types.ts';
 import { editableNodeIds } from './organization.ts';
 import { addAttachment, applySourceRelink, attachmentBlob, prepareAttachment, previewSourceRelink, removeAttachment } from './attachments.ts';
+import {t} from './i18n.ts';
 
 type AttachmentAPI = { SaveArtifact?(name:string,kind:string,data:string):Promise<string> };
 const native = () => (window as Window & {go?:{main?:{App?:AttachmentAPI}}}).go?.main?.App;
@@ -110,7 +111,7 @@ export function mountAttachmentsPanel(host:WorkbenchHost, container:HTMLElement)
   function update(){
     if(disposed)return;
     const doc=host.getDocument(),selected=selectedNode(),editable=selected&&editableNodeIds(doc).has(selected.id);
-    el('[data-attachment-selection]').textContent=selected?`첨부 대상: ${selected.text.split('\n')[0]||'이름 없는 요소'}${editable?'':' · 잠긴 요소'}`:'작업지에서 요소 하나를 선택한 뒤 파일을 첨부하세요.';
+    {const target=el('[data-attachment-selection]');target.dataset.noI18n='';target.textContent=selected?t('첨부 대상: {0}',selected.text.split('\n')[0]||t('이름 없는 요소'))+(editable?'':t(' · 잠긴 요소')):t('작업지에서 요소 하나를 선택한 뒤 파일을 첨부하세요.');}
     add.disabled=busy||!editable;apply.disabled=busy||!changes.length;
     if(previewDocument&&previewDocument!==doc)clearPreview();
     redrawList();

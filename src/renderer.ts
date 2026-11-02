@@ -1,8 +1,9 @@
 import type { Asset, Box, FlowDocument, FlowEdge, FlowNode, Point, RenderState } from './types.ts';
 import { bounds, edgePoints, portPoint, prepareRoutes, routeHandles } from './geometry.ts';
 import { FONT_FAMILY, PALETTE } from './theme.ts';
-import { renderRichContent, svgRichContent } from './rich-render.ts';
+import { renderRichContent, svgRichContent, WRAP_TOKENS } from './rich-render.ts';
 import { layoutEdgeLabels, type EdgeLabel } from './edge-labels.ts';
+import { t } from './i18n.ts';
 
 const FONT = FONT_FAMILY;
 const PAPER = PALETTE.paper;
@@ -52,16 +53,23 @@ function closeImage(bitmap?: Bitmap): void {
   else if (bitmap) bitmap.src = '';
 }
 
-function lineSegments(text: string, width: number, measure: (text: string) => number): string[] {
+export function lineSegments(text: string, width: number, measure: (text: string) => number): string[] {
   const result: string[] = [];
   for (const paragraph of text.replace(/\r/g, '').split('\n')) {
     if (!paragraph) { result.push(''); continue; }
-    let line = '';
-    for (const char of paragraph) {
-      if (line && measure(line + char) > width) {
-        result.push(line.trimEnd());
-        line = char.trimStart();
-      } else line += char;
+    let line = '', wrapped = false;
+    for (const token of paragraph.match(WRAP_TOKENS) ?? []) {
+      if (line && measure(line + token) > width) { result.push(line.trimEnd()); line = ''; wrapped = true; }
+      // Leading spaces a user typed are kept; the space at a wrap point is dropped.
+      if (!line && wrapped && /^\s$/.test(token)) continue;
+      if (!line && measure(token) > width) {
+        // A word wider than the box still breaks, so no text is ever hidden.
+        for (const char of token) {
+          if (line && measure(line + char) > width) { result.push(line); line = char; } else line += char;
+        }
+        continue;
+      }
+      line += token;
     }
     result.push(line);
   }
@@ -155,7 +163,7 @@ function drawNode(ctx: CanvasRenderingContext2D, node: FlowNode, bitmap?: Bitmap
       ctx.strokeRect(cx - 18, cy - 24, 36, 30);
       ctx.beginPath(); ctx.moveTo(cx - 15, cy + 2); ctx.lineTo(cx - 4, cy - 9); ctx.lineTo(cx + 4, cy - 2); ctx.lineTo(cx + 10, cy - 8); ctx.lineTo(cx + 16, cy + 2); ctx.stroke();
       ctx.fillStyle = PALETTE.muted; ctx.font = `12px ${FONT}`; ctx.textAlign = 'center';
-      if (textVisible) ctx.fillText(imageFailed ? '이미지를 읽을 수 없습니다' : '이미지', cx, cy + 27, node.w - 12);
+      if (textVisible) ctx.fillText(imageFailed ? t('이미지를 읽을 수 없습니다') : t('이미지'), cx, cy + 27, node.w - 12);
     }
     ctx.restore();
   }

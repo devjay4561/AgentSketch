@@ -2,6 +2,7 @@ import './ocr-panel.css';
 import { createNode, DOCUMENT_LIMITS } from './model.ts';
 import type { FlowDocument, FlowNode } from './types.ts';
 import type { WorkbenchHost } from './workspace-types.ts';
+import {t} from './i18n.ts';
 
 type OCRAPI = { ExtractImageText(data:string):Promise<string> };
 const native = () => (window as Window & {go?:{main?:{App?:OCRAPI}}}).go?.main?.App;
@@ -45,7 +46,7 @@ export function mountOcrPanel(host:WorkbenchHost, container:HTMLElement) {
       recognizedDoc=undefined;recognizedId='';result.value='';
       message(busy?'이전 이미지의 처리가 끝나면 새 이미지를 읽을 수 있습니다.':'');
     }
-    $<HTMLElement>('[data-ocr-source]').textContent=node?(asset?.name||node.text||'이름 없는 이미지'):'이미지 하나를 선택하세요';
+    {const source=$<HTMLElement>('[data-ocr-source]');source.dataset.noI18n='';source.textContent=node?(asset?.name||node.text||t('이름 없는 이미지')):t('이미지 하나를 선택하세요');}
     $<HTMLElement>('[data-ocr-availability]').textContent=typeof native()?.ExtractImageText==='function'
       ? 'PC에 설치된 Windows 인식 언어를 사용합니다. 결과를 자동으로 보드에 넣지 않습니다.'
       : '글자 읽기는 Windows 실행 파일에서 사용할 수 있습니다.';

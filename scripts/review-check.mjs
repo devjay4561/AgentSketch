@@ -4,7 +4,7 @@ import {writeFile} from 'node:fs/promises';
 const browser=await chromium.launch({channel:'msedge',headless:true,args:['--disable-features=AutofillAiWalletPrivatePasses']});
 const checks=[];
 try {
- const page=await browser.newPage({viewport:{width:1440,height:900}});const errors=[];page.on('pageerror',e=>errors.push(String(e)));await page.goto(process.env.AGENTSKETCH_TEST_URL || 'http://127.0.0.1:18440');
+ const page=await browser.newPage({locale:'ko-KR',viewport:{width:1440,height:900}});const errors=[];page.on('pageerror',e=>errors.push(String(e)));await page.goto(process.env.AGENTSKETCH_TEST_URL || 'http://127.0.0.1:18440');
  await page.evaluate(async()=>{
    const {mountReviewPanel}=await import('/src/review-panel.ts');const {createNode,emptyDocument,cloneDocument}=await import('/src/model.ts');
    const doc=emptyDocument();doc.title='검토 시험';const a=createNode('rect',40,80),b=createNode('rect',400,80);a.text='선행 자료';b.text='월간보고';doc.nodes=[a,b];doc.edges=[{id:'edge',from:a.id,to:b.id,fromPort:'right',toPort:'left',label:'선행 조건',color:'#67768a',width:2,style:'elbow',dashed:false,arrow:'end'}];doc.workspace={bookmarks:[{id:'book',name:'검토 보기',nodeId:a.id,viewport:{x:10,y:20,zoom:.8}}]};let selected=new Set([a.id]),panel;const history=[];

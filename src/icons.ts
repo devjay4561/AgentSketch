@@ -20,6 +20,7 @@ const paths: Record<string, string> = {
   export: '<path d="M12 16V3m-4 4 4-4 4 4M4 14v6h16v-6"/>',
   new: '<path d="M14 3H5v18h14V8Z"/><path d="M14 3v5h5m-7 3v6m-3-3h6"/>',
   open: '<path d="M3 8V5h7l2 3h9v12H3Z"/><path d="M3 11h18"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18"/>',
   save: '<path d="M4 3h13l4 4v14H3V3Zm3 0v6h10V3M7 21v-8h10v8"/>',
   'save-as': '<path d="M11 21H3V3h14l4 4v4M7 3v6h10V3M7 21v-8h5m3 7 5-5 2 2-5 5h-2Z"/>',
   search: '<circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/>',

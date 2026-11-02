@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light" />
   <meta name="description" content="자료와 생각을 자유롭게 연결하는 로컬 플로우차트 편집기" />
-  <title>AgentSketch · 플로우페이퍼</title>
+  <title>AgentSketch</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="preload" href="/fonts/PretendardVariable.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="stylesheet" href="/src/style.css" />
@@ -13,7 +13,7 @@
 <body>
   <div id="app">
     <header class="app-header">
-      <div class="brand" title="AgentSketch · 플로우페이퍼">
+      <div class="brand" title="AgentSketch">
         <svg class="brand-mark" width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><rect width="34" height="34" rx="8" fill="#f76b15"/><path d="M10 9h14v5H15v4h7v5h-7v4h-5Z" fill="#fff"/><path class="brand-tail" d="m23 23 4 4" stroke="#1c2024" stroke-width="3" stroke-linecap="round"/></svg>
         <span>AgentSketch</span>
       </div>
@@ -29,6 +29,8 @@
           <p class="menu-caption">예시로 시작하기</p>
           <button data-action="template-launch" aria-label="서비스 출시 준비 지도 예시 열기"><span data-icon="auto-layout"></span><span>서비스 출시 준비 지도</span></button>
           <button data-action="template-simple" aria-label="간단한 절차 예시 열기"><span data-icon="connect"></span><span>간단한 절차</span></button>
+          <div class="menu-separator"></div>
+          <button data-action="language" data-no-i18n aria-label="Language · 언어"><span data-icon="globe"></span><span>English</span></button>
         </div>
       </details>
       <div class="document-heading">

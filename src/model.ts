@@ -3,13 +3,14 @@ import { bounds } from './geometry.ts';
 import { PALETTE } from './theme.ts';
 import {validateNodeExtensions,validateEdgeExtensions,validateWorkspace} from './extension-validation.ts';
 import type {WorkspaceData} from './workspace-types.ts';
+import {t} from './i18n.ts';
 
 export const DOCUMENT_LIMITS = { nodes: 10_000, edges: 30_000, assets: 200, assetData: 20 * 1024 * 1024, totalAssetData: 50 * 1024 * 1024, coordinate: 1_000_000 } as const;
 
 export function uid(): string { return globalThis.crypto.randomUUID(); }
 
 export function createNode(kind: ShapeKind, x: number, y: number): FlowNode {
-  const text = kind === 'text' ? '텍스트를 입력하세요' : kind === 'note' ? '메모를 입력하세요' : kind === 'frame' ? '그룹 제목' : kind === 'draw' || kind === 'image' ? '' : '새 단계';
+  const text = kind === 'text' ? t('텍스트를 입력하세요') : kind === 'note' ? t('메모를 입력하세요') : kind === 'frame' ? t('그룹 제목') : kind === 'draw' || kind === 'image' ? '' : t('새 단계');
   return {
     id: uid(), kind, x, y, w: kind === 'frame' ? 560 : kind === 'text' ? 280 : kind === 'diamond' ? 180 : 220,
     h: kind === 'frame' ? 340 : kind === 'text' ? 64 : kind === 'note' ? 160 : kind === 'diamond' ? 140 : 100,
@@ -22,7 +23,7 @@ export function createNode(kind: ShapeKind, x: number, y: number): FlowNode {
 }
 
 export function emptyDocument(): FlowDocument {
-  return { format: 'agentsketch', version: 1, title: '이름 없는 보드', nodes: [], edges: [], assets: {}, viewport: { x: 80, y: 80, zoom: 1 } };
+  return { format: 'agentsketch', version: 1, title: t('이름 없는 보드'), nodes: [], edges: [], assets: {}, viewport: { x: 80, y: 80, zoom: 1 } };
 }
 
 export function cloneNode(node: FlowNode): FlowNode {
@@ -199,7 +200,7 @@ export function validateDocument(input: unknown): FlowDocument {
   if(edges.some(e=>e.condition&&!nodeIds.has(e.condition.nodeId)))throw new Error('연결 조건이 존재하지 않는 요소를 참조합니다.');
   const workspace=raw.workspace!==undefined?validateWorkspace(raw.workspace,nodes):undefined;
   if(!workspace&&nodes.some(n=>n.details?.attachmentIds?.length))throw new Error('요소가 참조하는 첨부 파일이 문서에 없습니다.');
-  return { ...(workspace?{workspace}:{}), format: 'agentsketch', version: 1, title: str(raw.title ?? '이름 없는 보드', '보드 이름', 300), nodes, edges, assets, viewport: { x: finite(viewport.x, '보기 가로 위치', -10_000_000, 10_000_000), y: finite(viewport.y, '보기 세로 위치', -10_000_000, 10_000_000), zoom: finite(viewport.zoom, '보기 배율', .05, 8) } };
+  return { ...(workspace?{workspace}:{}), format: 'agentsketch', version: 1, title: str(raw.title ?? t('이름 없는 보드'), '보드 이름', 300), nodes, edges, assets, viewport: { x: finite(viewport.x, '보기 가로 위치', -10_000_000, 10_000_000), y: finite(viewport.y, '보기 세로 위치', -10_000_000, 10_000_000), zoom: finite(viewport.zoom, '보기 배율', .05, 8) } };
 }
 
 function selected(doc: FlowDocument, ids: Iterable<string>): FlowNode[] {

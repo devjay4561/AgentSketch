@@ -29,3 +29,6 @@ Desktop.ini
 
 # design tooling state (local)
 .impeccable/
+
+# go build output in the repo root
+/agentsketch.exe

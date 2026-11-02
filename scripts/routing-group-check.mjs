@@ -8,7 +8,7 @@ const browser=await chromium.launch({channel:'msedge',headless:true,args:['--dis
 const checks=[],errors=[];
 const check=(value,message)=>{assert.ok(value,message);checks.push(message);};
 try {
- const page=await browser.newPage({viewport:{width:1440,height:900}});
+ const page=await browser.newPage({locale:'ko-KR',viewport:{width:1440,height:900}});
  page.on('pageerror',e=>errors.push(String(e)));
  await page.goto('http://127.0.0.1:18440');
  await page.waitForFunction(()=>document.querySelector('#save-status').textContent.includes('자동 복구 저장됨'));

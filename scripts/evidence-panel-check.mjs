@@ -5,7 +5,7 @@ await writeFile('output/evidence-harness.html',"<!doctype html><html><head><meta
 const server=await createServer({configFile:false,server:{host:'127.0.0.1',port:0,watch:null}});await server.listen();
 const address=server.httpServer.address();
 const browser=await chromium.launch({channel:'msedge',headless:true,args:['--disable-features=AutofillAiWalletPrivatePasses']});const checks=[],errors=[];const check=(v,s)=>{assert.ok(v,s);checks.push(s)};
-try{const page=await browser.newPage({viewport:{width:1200,height:1000}});page.on('pageerror',e=>errors.push(String(e)));await page.goto(`http://127.0.0.1:${address.port}/output/evidence-harness.html`);await page.getByLabel('요소 역할').waitFor();
+try{const page=await browser.newPage({locale:'ko-KR',viewport:{width:1200,height:1000}});page.on('pageerror',e=>errors.push(String(e)));await page.goto(`http://127.0.0.1:${address.port}/output/evidence-harness.html`);await page.getByLabel('요소 역할').waitFor();
 const field=async(name,value)=>{await page.getByLabel(name,{exact:true}).fill(value);await page.getByLabel(name,{exact:true}).press('Tab');};
 await page.getByLabel('요소 역할').selectOption('resource');await field('자료 담당자','운영팀');await field('자료 출처','C:\\자료\\판매량.xlsx');await field('자료 버전','v1');await field('확인자','김담당');
 await page.getByRole('button',{name:'직접 검토한 내용으로 확인 완료 기록'}).click();let state=await page.evaluate(()=>({node:evidenceHarness.doc.nodes[0],readiness:[...evidenceHarness.analysis().nodes.values()]}));check(state.node.details.status==='verified'&&state.node.details.verifiedVersion==='v1','explicit verification records current version and reviewer');check(state.readiness.every(n=>n.ready),'verified source unlocks its downstream step');

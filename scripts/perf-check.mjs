@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--disable-features=AutofillAiWalletPrivatePasses'] });
 try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+  const page = await browser.newPage({locale:'ko-KR',viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
   await page.goto('http://localhost:18440', { waitUntil: 'domcontentloaded' });
   const result = await page.evaluate(async () => {
     const { Renderer } = await import('/src/renderer.ts');

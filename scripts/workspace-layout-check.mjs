@@ -5,7 +5,7 @@ const checks=[],failures=[],errors=[];
 try{
  await mkdir('output/workspace',{recursive:true});
  for(const width of [1440,960]){
-  const page=await browser.newPage({viewport:{width,height:width===960?640:980}});page.on('pageerror',e=>errors.push(String(e)));await page.goto(process.env.AGENTSKETCH_TEST_URL||'http://127.0.0.1:18440');await page.waitForFunction(()=>document.querySelector('#save-status')?.textContent.includes('자동 복구 저장됨'));await page.getByRole('button',{name:'업무 도구',exact:true}).click();await page.locator('[data-evidence-list] [data-locate]').first().click();
+  const page=await browser.newPage({locale:'ko-KR',viewport:{width,height:width===960?640:980}});page.on('pageerror',e=>errors.push(String(e)));await page.goto(process.env.AGENTSKETCH_TEST_URL||'http://127.0.0.1:18440');await page.waitForFunction(()=>document.querySelector('#save-status')?.textContent.includes('자동 복구 저장됨'));await page.getByRole('button',{name:'업무 도구',exact:true}).click();await page.locator('[data-evidence-list] [data-locate]').first().click();
   const panels=await page.locator('.wb-nav [data-panel]').evaluateAll(buttons=>buttons.map(b=>b.dataset.panel));
   for(const name of panels){
    await page.locator(`.wb-nav [data-panel=${name}]`).click();await page.waitForFunction(name=>{const p=document.querySelector(`[data-workspace-panel=${name}]`);return p&&!p.hidden&&p.children.length>0&&!p.textContent.includes('도구를 열지 못했습니다.');},name);

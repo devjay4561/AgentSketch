@@ -7,7 +7,7 @@ import {emptyDocument,createNode} from '../src/model.ts';
 const browser=await chromium.launch({channel:'msedge',headless:true,args:['--disable-features=AutofillAiWalletPrivatePasses']});
 const checks=[],errors=[];
 try {
- const page=await browser.newPage({viewport:{width:1440,height:940}});page.on('pageerror',e=>errors.push(String(e)));
+ const page=await browser.newPage({locale:'ko-KR',viewport:{width:1440,height:940}});page.on('pageerror',e=>errors.push(String(e)));
  await page.goto(process.env.AGENTSKETCH_TEST_URL || 'http://127.0.0.1:18440');await page.waitForFunction(()=>document.querySelector('#save-status')?.textContent.includes('자동 복구 저장됨'));
  const fixture=emptyDocument();fixture.nodes=[createNode('rect',10,20),createNode('rect',400,20),createNode('image',10,250),createNode('note',400,250)];
  const fixtureDoc=await page.evaluate(async(doc)=>{

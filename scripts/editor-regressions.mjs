@@ -3,7 +3,7 @@ import { writeFile } from 'node:fs/promises';
 const browser = await chromium.launch({channel:'msedge',headless:true,args:['--disable-features=AutofillAiWalletPrivatePasses']});
 const checks=[];
 try {
-  const page=await browser.newPage({viewport:{width:1440,height:900}}), errors=[];
+  const page=await browser.newPage({locale:'ko-KR',viewport:{width:1440,height:900}}), errors=[];
   page.on('pageerror',e=>errors.push(String(e)));
   await page.goto('http://127.0.0.1:18440');
   await page.waitForFunction(()=>document.querySelector('#save-status').textContent.includes('자동 복구 저장됨'));

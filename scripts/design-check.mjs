@@ -141,7 +141,7 @@ async function feedbackChecks(page) {
 try {
   for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 960, height: 640 }]) {
     const label = `${viewport.width}x${viewport.height}`;
-    const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+    const context = await browser.newContext({locale:'ko-KR',viewport, deviceScaleFactor: 1 });
     const page = await context.newPage();
     page.on('pageerror', error => report.errors.push({ viewport: label, type: 'pageerror', error: String(error) }));
     page.on('requestfailed', request => report.errors.push({ viewport: label, type: 'requestfailed', url: request.url(), failure: request.failure() }));

@@ -118,7 +118,7 @@ func (a *App) SaveArtifact(name, kind, data string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{Title: "자료 내보내기", DefaultFilename: filenameWithExtension(name, "."+extension), Filters: []runtime.FileFilter{{DisplayName: strings.ToUpper(extension) + " 파일", Pattern: "*." + extension}}})
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{Title: a.tr("자료 내보내기", "Export"), DefaultFilename: filenameWithExtension(name, "."+extension), Filters: []runtime.FileFilter{{DisplayName: strings.ToUpper(extension) + " 파일", Pattern: "*." + extension}}})
 	if err != nil || path == "" {
 		return "", err
 	}

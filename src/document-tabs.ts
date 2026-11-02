@@ -2,6 +2,7 @@ import './document-tabs.css';
 import type { FlowDocument } from './types.ts';
 import type { WorkbenchHost } from './workspace-types.ts';
 import { cloneDocument, emptyDocument, uid, validateDocument } from './model.ts';
+import {t} from './i18n.ts';
 
 type TabsHost = Omit<WorkbenchHost,'replaceDocument'> & {
   getFilePath?():string; getDirty?():boolean;
@@ -59,7 +60,7 @@ export function mountDocumentTabs(host:TabsHost,container:HTMLElement) {
     for(const tab of tabs){
       const item=document.createElement('div');item.className='document-tab';item.classList.toggle('active',tab.id===activeId);
       const select=document.createElement('button');select.type='button';select.className='document-tab-select';select.setAttribute('role','tab');select.setAttribute('aria-selected',String(tab.id===activeId));select.tabIndex=tab.id===activeId?0:-1;
-      select.title=tab.path||`${tab.title} · 파일로 저장하지 않은 문서`;select.textContent=tab.title||'이름 없는 보드';select.setAttribute('aria-label',`${tab.title}${tab.dirty?' · 파일에 저장하지 않은 변경 있음':''}`);select.disabled=busy;
+      select.dataset.noI18n='';select.title=tab.path||t('{0} · 파일로 저장하지 않은 문서',tab.title);select.textContent=tab.title||t('이름 없는 보드');select.setAttribute('aria-label',tab.title+(tab.dirty?t(' · 파일에 저장하지 않은 변경 있음'):''));select.disabled=busy;
       if(tab.dirty){const mark=document.createElement('span');mark.className='document-tab-dirty';mark.setAttribute('aria-hidden','true');select.append(mark);}
       select.onclick=()=>void switchTo(tab.id);
       select.onkeydown=e=>{if(e.key!=='ArrowLeft'&&e.key!=='ArrowRight')return;e.preventDefault();const at=tabs.findIndex(t=>t.id===tab.id),next=tabs[(at+(e.key==='ArrowLeft'?-1:1)+tabs.length)%tabs.length];void switchTo(next.id);};
@@ -128,13 +129,13 @@ export function mountDocumentTabs(host:TabsHost,container:HTMLElement) {
     if(busy||!ready||blocked)return;const target=tabs.find(t=>t.id===id);if(!target)return;
     // Inactive tabs have already been durably checkpointed. Closing removes their
     // recovery copy, so unsaved content gets an explicit, truthful confirmation.
-    if(id!==activeId&&target.dirty&&!window.confirm(`“${target.title}”에는 파일로 저장하지 않은 변경이 있습니다. 탭 복구 사본을 닫고 삭제할까요?`))return;
+    if(id!==activeId&&target.dirty&&!window.confirm(t('“{0}”에는 파일로 저장하지 않은 변경이 있습니다. 탭 복구 사본을 닫고 삭제할까요?',target.title)))return;
     busy=true;render();
     try{
       host.commitEditing?.();
       capture();
       if(id===activeId){
-        if(target.dirty&&!host.getDirty?.()&&!window.confirm(`“${target.title}”의 미저장 변경을 닫고 탭 복구 사본을 삭제할까요?`))return;
+        if(target.dirty&&!host.getDirty?.()&&!window.confirm(t('“{0}”의 미저장 변경을 닫고 탭 복구 사본을 삭제할까요?',target.title)))return;
         const replacement=tabs.find(t=>t.id!==id),next=replacement?await loadTab(replacement):emptyDocument();
         const accepted=await host.replaceDocument(next,replacement?.path??'');if(accepted===false)return;
         deleted.add(id);tabs=tabs.filter(t=>t.id!==id);

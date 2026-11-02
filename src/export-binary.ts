@@ -5,6 +5,7 @@ import {layoutRichContent} from './rich-render.ts';
 import {textBox} from './renderer.ts';
 import {planPages,MAX_PDF_PAGES} from './pdf-pagination.ts';
 import type {PdfPrintOptions} from './pdf-pagination.ts';
+import {t} from './i18n.ts';
 
 export interface ExportOptions extends PdfPrintOptions { boldFontBytes?:Uint8Array; scope?:'all'|'selection'; selection?:Set<string>; pages?:boolean; includeInternalNotes?:boolean; }
 export function exportDocuments(doc:FlowDocument,options:ExportOptions={}) {
@@ -17,7 +18,7 @@ export function exportDocuments(doc:FlowDocument,options:ExportOptions={}) {
     const workspace=doc.workspace?{...doc.workspace,pages:doc.workspace.pages?.filter(p=>pageIds.has(p.id)),activePageId:pageIds.has(doc.workspace.activePageId)?doc.workspace.activePageId:doc.workspace.pages?.find(p=>pageIds.has(p.id))?.id,layers:doc.workspace.layers?.filter(l=>layerIds.has(l.id)),groups:doc.workspace.groups?.filter(g=>groups.has(g.id)),comments:doc.workspace.comments?.filter(c=>c.nodeId&&ids.has(c.nodeId)),bookmarks:doc.workspace.bookmarks?.filter(b=>b.nodeId&&ids.has(b.nodeId)),attachments:doc.workspace.attachments?.filter(a=>attachmentIds.has(a.id))}:undefined;
     return {...doc,title,nodes,edges:doc.edges.filter(e=>ids.has(e.from)&&ids.has(e.to)),assets:Object.fromEntries(Object.entries(doc.assets).filter(([id])=>assetIds.has(id))),...(workspace?{workspace}:{})};
   };
-  if(selected)return [filter(options.selection!,doc.title+' · 선택 영역')];
+  if(selected)return [filter(options.selection!,doc.title+t(' · 선택 영역'))];
   const pages=doc.workspace?.pages;
   if(options.pages && pages?.length){
     const first=pages[0].id;
@@ -52,7 +53,7 @@ export function exportBounds(doc:FlowDocument) {
 }
 export function nodeExportText(node:FlowNode):string {
  if(node.contentMode==='table'&&node.table)return [node.text,...[node.table.columns,...node.table.rows].map(row=>row.join(' | '))].filter(Boolean).join('\n');
- if(node.contentMode==='checklist')return [node.text,...(node.details?.checklist??[]).map(item=>(item.done?'[완료] ':'[미완료] ')+item.text)].filter(Boolean).join('\n');
+ if(node.contentMode==='checklist')return [node.text,...(node.details?.checklist??[]).map(item=>(item.done?t('[완료]')+' ':t('[미완료]')+' ')+item.text)].filter(Boolean).join('\n');
  return node.textRuns?.map(run=>run.text).join('')??node.text;
 }
 function hex(color:string,fallback='FFFFFF'){const raw=color.replace('#','');return /^[0-9a-f]{3}$/i.test(raw)?raw.split('').map(x=>x+x).join(''):/^[0-9a-f]{6,8}$/i.test(raw)?raw.slice(0,6):fallback;}
@@ -69,7 +70,7 @@ async function imageData(doc:FlowDocument,node:FlowNode):Promise<string|undefine
  const out=canvas.toDataURL('image/png');canvas.width=canvas.height=1;image.src='';return out;
 }
 export async function createPowerPoint(doc:FlowDocument,options:ExportOptions={}):Promise<{base64:string;warnings:string[]}>{
- const {default:PptxGenJS}=await import('pptxgenjs');const pptx=new PptxGenJS();pptx.layout='LAYOUT_WIDE';pptx.author='AgentSketch';pptx.subject='편집 가능한 업무 흐름';pptx.title=doc.title;
+ const {default:PptxGenJS}=await import('pptxgenjs');const pptx=new PptxGenJS();pptx.layout='LAYOUT_WIDE';pptx.author='AgentSketch';pptx.subject=t('편집 가능한 업무 흐름');pptx.title=doc.title;
  const warnings=new Set<string>(['PowerPoint에서 Pretendard가 설치되지 않은 경우 대체 글꼴로 표시됩니다.','연결선은 편집 가능한 선 조각이며 PowerPoint 도형에 자동으로 붙어 움직이지 않습니다.']);
  for(const board of exportDocuments(doc,options)){
   const slide=pptx.addSlide(),b=exportBounds(board),scale=Math.min(12.6/b.w,6.5/b.h),ox=.36-b.x*scale,oy=.7-b.y*scale;
@@ -116,7 +117,7 @@ export async function createVectorPDF(doc:FlowDocument,fontBytes:Uint8Array,opti
   for(const plan of plans){
    const page=pdf.addPage(plan.size),{clip,scale,origin}=plan,x=(v:number)=>clip.x+(v-origin.x)*scale,y=(v:number)=>clip.y+clip.h-(v-origin.y)*scale;
    const visible=(box:{x:number;y:number;w:number;h:number})=>box.x+box.w>=origin.x&&box.y+box.h>=origin.y&&box.x<=origin.x+clip.w/scale&&box.y<=origin.y+clip.h/scale;
-   const title=board.title+(plans.length>1?` · ${plan.row+1}행 ${plan.column+1}열 / ${plan.rows}×${plan.columns}`:'');
+   const title=board.title+(plans.length>1?t(' · {0}행 {1}열 / {2}×{3}',plan.row+1,plan.column+1,plan.rows,plan.columns):'');
    const titleSize=Math.min(12,clip.w/Math.max(1,font.widthOfTextAtSize(title,1)));
    page.drawText(title,{x:clip.x,y:clip.y+clip.h+8,font,size:titleSize,color:color('#1C2024')});
    page.pushOperators(lib.pushGraphicsState(),lib.rectangle(clip.x,clip.y,clip.w,clip.h),lib.clip(),lib.endPath());

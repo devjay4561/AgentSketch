@@ -11,22 +11,36 @@ const layouts=new WeakMap<FlowNode,{signature:string;layout:ContentLayout|null}>
 const escape=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]!));
 const safeLink=(href?:string)=>{if(!href)return undefined;try{const url=new URL(href);return ['https:','http:','mailto:'].includes(url.protocol)?href:undefined;}catch{return undefined;}};
 const font=(size:number,bold:boolean,family:string)=>`${bold?600:400} ${size}px ${family}`;
+/** Latin words (with attached digits and punctuation) wrap whole; Hangul and other text wraps per character. */
+export const WRAP_TOKENS=/[\p{Script=Latin}\d'’\-_.,:;!?()/&%+#@=]+|\s|./gsu;
 const fallbackMeasure:Measure=(text,size)=>[...text].reduce((n,c)=>n+size*(c.charCodeAt(0)>255?1:.55),0);
 
 /** Whole text is retained in this layout; the caller chooses the visible node box. */
 function textLayout(runs:TextRun[],width:number,defaults:{fontSize:number;bold:boolean;color:string},measure:Measure):{lines:TextItem[][];heights:number[];widths:number[]} {
   const lines:TextItem[][]=[[]],heights:number[]=[defaults.fontSize*1.45],widths:number[]=[0];
   const nextLine=()=>{lines.push([]);heights.push(defaults.fontSize*1.45);widths.push(0);};
+  const limit=Math.max(1,width),used=()=>widths[widths.length-1];
+
   for(const run of runs){
     const size=run.fontSize??defaults.fontSize,bold=run.bold??defaults.bold,color=run.color??defaults.color,href=safeLink(run.href);
-    for(const char of run.text.replace(/\r/g,'')){
-      if(char==='\n'){nextLine();continue;}
-      let line=lines.length-1;const cw=measure(char,size,bold);
-      if(widths[line]>0&&widths[line]+cw>Math.max(1,width)){nextLine();line++;}
-      const current=lines[line],last=current.at(-1);
-      if(last&&last.fontSize===size&&last.bold===bold&&last.color===color&&last.href===href){last.text+=char;}
-      else current.push({text:char,x:widths[line],y:0,fontSize:size,bold,color,...(href?{href}:{})});
-      widths[line]+=cw;heights[line]=Math.max(heights[line],size*1.45);
+    const put=(text:string,w:number)=>{
+      const line=lines.length-1,current=lines[line],last=current.at(-1);
+      if(last&&last.fontSize===size&&last.bold===bold&&last.color===color&&last.href===href){last.text+=text;}
+      else current.push({text,x:widths[line],y:0,fontSize:size,bold,color,...(href?{href}:{})});
+      widths[line]+=w;heights[line]=Math.max(heights[line],size*1.45);
+    };
+    for(const token of run.text.replace(/\r/g,'').match(WRAP_TOKENS)??[]){
+      if(token==='\n'){nextLine();continue;}
+      const tw=measure(token,size,bold);
+      // A space at the wrap point stays at the end of the line, so exports keep every character.
+      if(/^\s$/.test(token)){put(token,tw);continue;}
+      if(used()>0&&used()+tw>limit)nextLine();
+      if(used()===0&&tw>limit){
+        // A word wider than the box still breaks, so no text is ever hidden.
+        for(const char of token){const cw=measure(char,size,bold);if(used()>0&&used()+cw>limit)nextLine();put(char,cw);}
+        continue;
+      }
+      put(token,tw);
     }
   }
   return {lines,heights,widths};

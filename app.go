@@ -29,6 +29,17 @@ type App struct {
 	allowClose  atomic.Bool
 	launchMu    sync.Mutex
 	launchPath  string
+	english     atomic.Bool
+}
+
+// SetLanguage is called by the frontend with its UI language ("ko" or "en") for native dialogs.
+func (a *App) SetLanguage(lang string) { a.english.Store(lang == "en") }
+
+func (a *App) tr(ko, en string) string {
+	if a.english.Load() {
+		return en
+	}
+	return ko
 }
 
 func NewApp() *App {
@@ -109,8 +120,8 @@ func (a *App) CloseWithRecoveryForDocument(data string, path string) error {
 
 func (a *App) OpenDocument() (*OpenResult, error) {
 	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
-		Title:   "AgentSketch 문서 열기",
-		Filters: []runtime.FileFilter{{DisplayName: "AgentSketch 문서", Pattern: "*.agentsketch;*.flowpaper;*.json"}},
+		Title:   a.tr("AgentSketch 문서 열기", "Open AgentSketch document"),
+		Filters: []runtime.FileFilter{{DisplayName: a.tr("AgentSketch 문서", "AgentSketch document"), Pattern: "*.agentsketch;*.flowpaper;*.json"}},
 	})
 	if err != nil {
 		return nil, err
@@ -173,8 +184,8 @@ func (a *App) SaveDocument(data string, path string, saveAs bool) (string, error
 	if path == "" || saveAs {
 		var err error
 		path, err = runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-			Title: "AgentSketch 문서 저장", DefaultFilename: filenameWithExtension(documentName(data), ".agentsketch"),
-			Filters: []runtime.FileFilter{{DisplayName: "AgentSketch 문서", Pattern: "*.agentsketch"}},
+			Title: a.tr("AgentSketch 문서 저장", "Save AgentSketch document"), DefaultFilename: filenameWithExtension(documentName(data), ".agentsketch"),
+			Filters: []runtime.FileFilter{{DisplayName: a.tr("AgentSketch 문서", "AgentSketch document"), Pattern: "*.agentsketch"}},
 		})
 		if err != nil {
 			return "", err
@@ -224,8 +235,8 @@ func (a *App) ExportFile(name string, kind string, data string) (string, error) 
 		return "", err
 	}
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title: strings.ToUpper(kind) + "로 내보내기", DefaultFilename: filenameWithExtension(name, "."+kind),
-		Filters: []runtime.FileFilter{{DisplayName: strings.ToUpper(kind) + " 파일", Pattern: "*." + kind}},
+		Title: a.tr(strings.ToUpper(kind)+"로 내보내기", "Export as "+strings.ToUpper(kind)), DefaultFilename: filenameWithExtension(name, "."+kind),
+		Filters: []runtime.FileFilter{{DisplayName: a.tr(strings.ToUpper(kind)+" 파일", strings.ToUpper(kind)+" file"), Pattern: "*." + kind}},
 	})
 	if err != nil {
 		return "", err

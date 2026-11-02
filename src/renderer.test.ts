@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Renderer, renderSVG } from './renderer.ts';
+import { Renderer, renderSVG, lineSegments } from './renderer.ts';
 import { createNode, emptyDocument, validateDocument } from './model.ts';
 
 test('SVG escapes user text and document titles', () => {
@@ -92,4 +92,13 @@ test('a short text heading keeps its first line inside the canvas clip and match
   const svgY = Number(renderSVG(doc).match(/<tspan x="[^"]+" y="([^"]+)"/)?.[1]);
   assert.equal(svgY, lines[0].y);
   assert.deepEqual({ x: heading.x, y: heading.y, w: heading.w, h: heading.h }, geometryBefore);
+});
+
+test('wrapping keeps English words whole, Hangul per character, and never hides text', () => {
+  const mono = (s: string) => [...s].length;
+  assert.deepEqual(lineSegments('screen mockups final', 10, mono), ['screen', 'mockups', 'final']);
+  assert.deepEqual(lineSegments('가나다라마바', 4, mono), ['가나다라', '마바']);
+  assert.deepEqual(lineSegments('supercalifragilistic', 8, mono), ['supercal', 'ifragili', 'stic']);
+  assert.deepEqual(lineSegments('  indented', 20, mono), ['  indented']);
+  assert.equal(lineSegments('screen mockups final', 10, mono).join('').replace(/\s/g, ''), 'screenmockupsfinal');
 });

@@ -19,8 +19,14 @@ import { isNative, openDocument, saveDocument, autosave, loadAutosave, exportFil
 import { icon } from './icons.ts';
 import { FONT_FAMILY, PALETTE } from './theme.ts';
 import { setupUIFeedback } from './ui-feedback.ts';
+import { installDomTranslation, lang, setLang, t } from './i18n.ts';
 
+installDomTranslation();
 setupUIFeedback();
+// The native window title is set by Go before the page loads.
+if (lang === 'en') (window as any).runtime?.WindowSetTitle?.(t('AgentSketch · 흐름을 한 장에'));
+(window as any).go?.main?.App?.SetLanguage?.(lang);
+{ const b = document.querySelector<HTMLElement>('[data-action="language"] span:last-child'); if (b) b.textContent = lang === 'ko' ? 'English' : '한국어'; }
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('board');
@@ -567,6 +573,7 @@ async function runAction(action: string) {
       finishEdit(); if (!doc.nodes.length) { toast('내보낼 요소를 먼저 추가하세요.'); break; }
       toast('보드를 내보내고 있습니다…'); const path = await exportFile(projectVisibleDocument(doc), action.slice(7) as 'png' | 'svg' | 'pdf' | 'html'); if (path) toast('내보내기를 완료했습니다.'); break;
     }
+    case 'language': setLang(lang === 'ko' ? 'en' : 'ko'); toast(lang === 'ko' ? 'Restart AgentSketch to switch to English. · 다시 시작하면 영어로 바뀝니다.' : '다시 시작하면 한국어로 바뀝니다. · Restart AgentSketch to switch to Korean.'); break;
     case 'template-launch': case 'template-simple': if (await guardReplace()) { replaceDocument(createSample(action === 'template-launch' ? 'launch' : 'simple')); dirty = true; fit(); toast('설명용 예시를 열었습니다. 자유롭게 편집하세요.'); } break;
     case 'help': $<HTMLDialogElement>('help-dialog').showModal(); break;
     case 'focus': $('app').classList.toggle('focus-mode'); break;

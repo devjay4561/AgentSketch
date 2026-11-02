@@ -7,7 +7,7 @@ import {chromium} from 'playwright';
 const root=path.resolve('output/ai-presence');await fs.mkdir(root,{recursive:true});const checks=[];
 const browser=await chromium.launch({channel:'msedge',args:['--disable-features=AutofillAiWalletPrivatePasses']});
 try{
- const page=await browser.newPage({viewport:{width:1440,height:900}});
+ const page=await browser.newPage({locale:'ko-KR',viewport:{width:1440,height:900}});
  await page.addInitScript(()=>{
   const handlers={};window.__replies={};
   const emit=(name,...args)=>(handlers[name]??[]).forEach(fn=>fn(...args));window.__emit=emit;

@@ -1,11 +1,20 @@
 import { createNode, emptyDocument, uid } from './model.ts';
 import type { FlowDocument, FlowEdge, FlowNode, ShapeKind } from './types.ts';
 import { PALETTE } from './theme.ts';
+import { t } from './i18n.ts';
 
 type TemplateName = 'blank' | 'launch' | 'simple';
 
 /** Editable teaching examples only. These are not executable business rules. */
 export function createSample(which: TemplateName = 'launch'): FlowDocument {
+  const doc = buildSample(which);
+  doc.title = t(doc.title);
+  for (const n of doc.nodes) n.text = t(n.text);
+  for (const e of doc.edges) e.label = t(e.label);
+  return doc;
+}
+
+function buildSample(which: TemplateName): FlowDocument {
   const doc = emptyDocument();
   if (which === 'blank') return doc;
 

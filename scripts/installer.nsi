@@ -9,7 +9,7 @@ Unicode true
 !error "OUTPUT is required"
 !endif
 !ifndef VERSION
-!define VERSION "0.1.0"
+!define VERSION "0.1.1"
 !endif
 Name "AgentSketch"
 OutFile "${OUTPUT}"

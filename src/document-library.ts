@@ -2,6 +2,7 @@ import './document-library.css';
 import type { FlowDocument } from './types.ts';
 import type { WorkbenchHost } from './workspace-types.ts';
 import { validateDocument } from './model.ts';
+import {t} from './i18n.ts';
 
 interface RecentDocument { path: string; title: string; openedAt: string }
 interface DocumentVersion { id: string; path: string; title: string; createdAt: string; size: number }
@@ -108,7 +109,7 @@ export function mountDocumentLibrary(host: WorkbenchHost, container: HTMLElement
     if (!versions?.length) { empty(list, selectedPath ? '이 파일의 이전 버전이 아직 없습니다.' : '보관한 작업이 없습니다. 현재 작업 보관을 눌러 시작하세요.'); return; }
     for (const version of versions) {
       const button = document.createElement('button'); button.type = 'button'; button.className = 'library-version'; button.dataset.versionId = version.id;
-      const title = document.createElement('strong'); title.textContent = version.title || '이름 없는 보드';
+      const title = document.createElement('strong'); title.dataset.noI18n = ''; title.textContent = version.title || t('이름 없는 보드');
       const meta = document.createElement('span'); meta.textContent = `${dateText(version.createdAt)} · ${sizeText(version.size)} · 사본으로 열기`;
       button.append(title, meta);
       button.addEventListener('click', () => void run(async () => {
@@ -130,7 +131,7 @@ export function mountDocumentLibrary(host: WorkbenchHost, container: HTMLElement
       for (const document of documents ?? []) {
         const row = window.document.createElement('div'); row.className = 'library-file';
         const button = window.document.createElement('button'); button.type = 'button'; button.className = 'library-open'; button.title = document.path;
-        const title = window.document.createElement('strong'); title.textContent = document.title || document.path.split(/[\\/]/).at(-1) || '문서';
+        const title = window.document.createElement('strong'); title.dataset.noI18n = ''; title.textContent = document.title || document.path.split(/[\\/]/).at(-1) || '문서';
         const meta = window.document.createElement('span'); meta.textContent = document.path;
         button.append(title, meta);
         button.addEventListener('click', () => void run(async () => {

@@ -15,7 +15,7 @@ base.nodes[1].details={role:'resource',status:'verified',source:'C:/fixtures/rec
 base.edges=[['a','c'],['b','c']].map(([from,to],i)=>({id:'edge'+i,from,to,fromPort:'right',toPort:'left',label:'선행 조건',color:'#67768a',width:2,style:'elbow',arrow:'end',dashed:false,relation:'required'}));
 let page;
 try{
- page=await browser.newPage({viewport:{width:1440,height:980}});page.on('pageerror',e=>runtimeErrors.push(String(e)));
+ page=await browser.newPage({locale:'ko-KR',viewport:{width:1440,height:980}});page.on('pageerror',e=>runtimeErrors.push(String(e)));
  await page.goto(process.env.AGENTSKETCH_TEST_URL||'http://127.0.0.1:18440');
  await page.waitForFunction(()=>document.querySelector('#save-status')?.textContent.includes('자동 복구 저장됨'));
  const read=async()=>{await page.waitForTimeout(750);return page.evaluate(()=>new Promise((resolve,reject)=>{const q=indexedDB.open('agentsketch',1);q.onerror=reject;q.onsuccess=()=>{const db=q.result,r=db.transaction('documents').objectStore('documents').get('recovery');r.onsuccess=()=>{resolve(JSON.parse(r.result));db.close();};};}));};

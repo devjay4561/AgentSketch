@@ -4,6 +4,17 @@
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-02
+
+### Added
+
+- 영어 UI. Windows 언어가 한국어가 아니면 영어로 시작하고, **파일 → English / 한국어**에서 바꿀 수 있습니다(다시 시작하면 적용). 예시 보드, 파일 대화상자, 내보낸 보고서도 함께 바뀝니다.
+
+### Changed
+
+- 도형 안 글자 줄바꿈이 영어 단어를 중간에서 자르지 않습니다. 한글은 지금처럼 글자 단위로 줄을 바꾸고, 상자보다 긴 단어는 잘라서 모든 글자를 표시합니다.
+- 배포 zip에는 실행 파일, CLI, MCP 서버, 스킬, 라이선스만 넣습니다.
+
 ## [0.1.0] - 2026-11-02
 
 첫 공개 베타입니다. 이전 이름(FlowPaper)으로 만든 `.flowpaper` 파일과 `%APPDATA%\FlowPaper` 복구 데이터도 그대로 이어서 쓸 수 있습니다.
@@ -21,5 +32,6 @@
 - 자동 복구, 단일 인스턴스, 사용자별 NSIS 설치 파일
 - 설명용 예시 보드: *서비스 출시 준비 지도*, *간단한 업무 흐름*
 
-[Unreleased]: https://github.com/devjay4561/AgentSketch/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/devjay4561/AgentSketch/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/devjay4561/AgentSketch/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/devjay4561/AgentSketch/releases/tag/v0.1.0

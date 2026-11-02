@@ -89,7 +89,7 @@ export function mountReviewPanel(host:WorkbenchHost,container:HTMLElement){
     if(p.doc.workspace)p.doc.workspace.activePageId=stop.pageId;
     host.select([]);
     if(stop.viewport){p.doc.viewport={...stop.viewport};host.invalidate();}else{const ids=new Set(stop.nodeIds);host.fit(p.doc.nodes.filter(n=>ids.has(n.id)));}
-    bar.querySelector('[data-present="title"]')!.textContent=stop.label;
+    {const label=bar.querySelector<HTMLElement>('[data-present="title"]')!;label.dataset.noI18n='';label.textContent=stop.label;}
     bar.querySelector('[data-present="position"]')!.textContent=`${p.index+1} / ${p.stops.length}`;
     (bar.querySelector('[data-present="previous"]') as HTMLButtonElement).disabled=p.index===0;
     (bar.querySelector('[data-present="next"]') as HTMLButtonElement).disabled=p.index===p.stops.length-1;
