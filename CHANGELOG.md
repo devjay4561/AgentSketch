@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-04
+
 ### Added
 
 - macOS arm64 및 universal `.app` 빌드와 Windows/macOS CI·통합 릴리스 작업을 추가했습니다. Apple Vision OCR, Finder 문서 연결, macOS용 CLI 래퍼를 제공합니다.
@@ -37,6 +39,8 @@
 - 자동 복구, 단일 인스턴스, 사용자별 NSIS 설치 파일
 - 설명용 예시 보드: *서비스 출시 준비 지도*, *간단한 업무 흐름*
 
-[Unreleased]: https://github.com/devjay4561/AgentSketch/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/devjay4561/AgentSketch/compare/v0.1.2...HEAD
 [0.1.1]: https://github.com/devjay4561/AgentSketch/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/devjay4561/AgentSketch/releases/tag/v0.1.0
+
+[0.1.2]: https://github.com/devjay4561/AgentSketch/compare/v0.1.1...v0.1.2

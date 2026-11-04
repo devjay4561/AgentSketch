@@ -12,7 +12,7 @@
   "info": {
     "companyName": "AgentSketch",
     "productName": "AgentSketch",
-    "productVersion": "0.1.1",
+    "productVersion": "0.1.2",
     "copyright": "Copyright (c) 2026 AgentSketch contributors. MIT License.",
     "comments": "오프라인 플로우차트 편집기",
     "fileAssociations": [
