@@ -40,7 +40,7 @@
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
           <span>GitHub</span>
         </a>
-        <a class="btn btn-sm" href="https://github.com/devjay4561/AgentSketch/releases/latest" data-k="navDownload">다운로드</a>
+        <a class="btn btn-sm" href="#download" data-k="navDownload">다운로드</a>
       </div>
     </div>
   </header>
@@ -51,14 +51,17 @@
       <div class="hero-copy">
         <h1 id="hero-title" data-k="heroTitle">흩어진 캡처를,<br />한 장의 흐름으로.</h1>
         <p class="lede" data-k="heroLede">캡처를 붙여 넣고 AI 에이전트에게 맡기세요. Claude나 Codex가 AgentSketch 앱에 직접 연결해 도형과 연결선, 배치까지 정리합니다.</p>
+        <label class="platform-picker"><span data-k="platform">다운로드 OS</span>
+          <select data-platform aria-label="다운로드 OS" data-k-aria="platform"><option value="">OS 선택 / Choose OS</option><option value="windows">Windows x64</option><option value="macos">macOS · Apple Silicon / Intel</option></select>
+        </label>
         <div class="cta-row">
           <a class="btn btn-lg" href="https://github.com/devjay4561/AgentSketch/releases/latest" data-download>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v13m-5-5 5 5 5-5M4 20h16"/></svg>
-            <span data-k="ctaDownload">Windows / macOS 다운로드</span>
+            <span data-download-label>OS 선택 / Choose OS</span>
           </a>
           <a class="link-arrow" href="https://github.com/devjay4561/AgentSketch" data-k="ctaSource">소스 코드 보기</a>
         </div>
-        <p class="meta"><span data-release>v0.1.1</span> · Windows 10/11 · macOS 12+ · <span data-k="metaFree">MIT 오픈소스</span></p>
+        <p class="meta"><span data-release>v0.1.2</span> · Windows 10/11 · macOS 12+ · <span data-k="metaFree">MIT 오픈소스</span></p>
       </div>
 
       <figure class="video-frame hero-video">
@@ -272,7 +275,7 @@ agentsketch.cmd connect</code></pre>
     <!-- Local-first -->
     <section class="local" aria-labelledby="local-title">
       <div class="wrap">
-        <h2 id="local-title" class="big" data-k="localTitle">설치 마법사도, 계정도, 클라우드도 없습니다. <em>22MB 실행 파일 하나</em>가 이 PC에서 전부 합니다.</h2>
+        <h2 id="local-title" class="big" data-k="localTitle">계정도, 클라우드도 없습니다. Windows 실행 파일 또는 macOS 앱으로 이 PC에서 작업하세요.</h2>
         <p class="sub" data-k="localSub">문서와 자동 복구 파일은 내 PC에만 저장됩니다. 텔레메트리와 자동 업데이트 요청이 없고, OCR·외부 AI·LAN 공동 작업은 직접 켤 때만 네트워크를 씁니다.</p>
       </div>
     </section>
@@ -281,20 +284,24 @@ agentsketch.cmd connect</code></pre>
     <section class="close" id="download" aria-labelledby="close-title">
       <div class="wrap close-in">
         <h2 id="close-title" data-k="closeTitle">받아서, 첫 흐름을 그려 보세요.</h2>
+        <label class="platform-picker"><span data-k="platform">다운로드 OS</span>
+          <select data-platform aria-label="다운로드 OS" data-k-aria="platform"><option value="">OS 선택 / Choose OS</option><option value="windows">Windows x64</option><option value="macos">macOS · Apple Silicon / Intel</option></select>
+        </label>
         <div class="close-actions">
           <a class="btn btn-lg" href="https://github.com/devjay4561/AgentSketch/releases/latest" data-download>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v13m-5-5 5 5 5-5M4 20h16"/></svg>
-            <span data-k="ctaDownload">Windows / macOS 다운로드</span>
+            <span data-download-label>OS 선택 / Choose OS</span>
           </a>
           <a class="btn btn-ghost" href="https://github.com/devjay4561/AgentSketch">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/></svg>
             <span data-k="ctaStar">GitHub에서 별 주기</span>
           </a>
         </div>
+        <p class="download-info" data-download-info aria-live="polite">OS를 선택하세요. / Choose an OS.</p>
         <dl class="reqs">
           <div><dt data-k="reqOs">필요 환경</dt><dd data-k="reqOsD">Windows 10/11 x64 또는 macOS 12 이상</dd></div>
-          <div><dt data-k="reqAi">AI 연결</dt><dd data-k="reqAiD">Node.js 24 이상, Microsoft Edge</dd></div>
-          <div><dt data-k="reqSign">서명</dt><dd><span data-k="reqSignD">코드 서명이 없어 처음 실행할 때 SmartScreen 경고가 뜰 수 있습니다.</span> <a href="https://github.com/devjay4561/AgentSketch/releases/latest" data-k="reqSha">SHA256으로 확인</a></dd></div>
+          <div><dt data-k="reqAi">AI 연결</dt><dd data-k="reqAiD">Node.js 24 이상, Windows는 Edge, macOS는 Chrome/Edge</dd></div>
+          <div><dt data-k="reqSign">서명</dt><dd><span data-k="reqSignD">Windows는 SmartScreen 경고가 표시될 수 있습니다. macOS는 ad-hoc 서명만 적용되며 Developer ID 서명과 공증이 없어 Gatekeeper가 첫 실행을 막을 수 있습니다.</span> <a href="https://github.com/devjay4561/AgentSketch/releases/latest" data-k="reqSha">SHA256으로 확인</a></dd></div>
         </dl>
       </div>
     </section>

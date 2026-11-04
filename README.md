@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="public/favicon.svg" width="88" height="88" alt="AgentSketch 로고" />
+<img src="public/favicon.svg" width="88" height="88" alt="AgentSketch logo" />
 
 # AgentSketch <sup>Beta</sup>
 
-**자료와 절차의 관계를 한 장에 — Windows와 macOS에서 동작하는 오프라인 플로우차트 편집기**
+**Map sources, prerequisites and processes on one canvas — an offline flowchart editor for Windows and macOS**
 
 [![CI](https://github.com/devjay4561/AgentSketch/actions/workflows/ci.yml/badge.svg)](https://github.com/devjay4561/AgentSketch/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/devjay4561/AgentSketch?display_name=tag&sort=date&include_prereleases)](https://github.com/devjay4561/AgentSketch/releases)
@@ -15,94 +15,99 @@
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
 ![Wails](https://img.shields.io/badge/Wails-v2.17-DF0000)
 
-[웹사이트](https://devjay4561.github.io/AgentSketch/) ·
-[다운로드](https://github.com/devjay4561/AgentSketch/releases/latest) ·
-[사용안내](docs/사용안내.md) ·
-[AI 제어](docs/AI-사용안내.md) ·
-[기여하기](CONTRIBUTING.md) ·
-[English](README.en.md)
+[Website](https://devjay4561.github.io/AgentSketch/) ·
+[Download](https://github.com/devjay4561/AgentSketch/releases/latest) ·
+[User guide (KO)](docs/사용안내.md) ·
+[Agent control (KO)](docs/AI-사용안내.md) ·
+[Contributing](CONTRIBUTING.md) ·
+[한국어](README.ko.md)
 
-<img src="docs/images/screenshot.png" alt="AgentSketch 편집 화면 — 서비스 출시 준비 지도 예시" width="100%" />
+<img src="docs/images/screenshot.png" alt="AgentSketch editor showing the sample launch-readiness board" width="100%" />
 
-<img src="docs/images/demo.gif" alt="왼쪽 터미널의 AI 에이전트가 MCP로 AgentSketch 앱을 조작해 법률 제정 과정 지도를 그리는 실제 세션" width="100%" />
-<sub>대본 없는 실제 세션: gjc + DeepSeek V4.1 Flash가 MCP로 실행 중인 앱에 직접 그립니다 (생각하는 구간 13배속, 그리는 구간 2배속)</sub>
+<img src="docs/images/demo.gif" alt="Real session: an AI agent in the terminal drives the AgentSketch app over MCP to draw a legislative-process map" width="100%" />
+<sub>Unscripted real session: gjc + DeepSeek V4.1 Flash draws in the running app over MCP (thinking 13×, drawing 2×)</sub>
 
 </div>
 
-## 왜 AgentSketch인가
+> [!NOTE]
+> **macOS is available in [v0.1.2](https://github.com/devjay4561/AgentSketch/releases/tag/v0.1.2).** Download the universal app for Apple Silicon and Intel Macs, or the Windows x64 ZIP. Choose your platform on the [download website](https://devjay4561.github.io/AgentSketch/#download).
+>
+> The app supports English and Korean. Detailed guides are primarily in Korean; the [macOS agent install guide](docs/agent-install-macos.md) is in English.
 
-큰 종이에 그리듯 도형·글·메모·이미지를 놓고 연결선으로 이어서, **어떤 자료가 어디서 와서 무엇의 선행 조건이 되는지**를 설명합니다. 화면 캡처를 붙여넣고 그 위에 설명을 쓰는 작업에 맞춰 설계했습니다.
+## Why AgentSketch
 
-- 🪶 **가벼움** — Windows에서는 WebView2 단일 실행 파일, Mac에서는 WKWebView 앱으로 실행합니다. Node 서버나 Chromium 배포본이 필요 없고, 편집이 없을 때는 다시 그리지 않습니다.
-- 🔒 **로컬 우선** — 기본 편집·저장·내보내기는 모두 이 PC에서 동작합니다. Windows OCR 또는 macOS Apple Vision OCR, AI 요청, LAN 공동 작업은 로컬 처리되거나 사용자가 직접 켤 때만 네트워크를 사용합니다.
-- 🧭 **관계 중심** — 장애물을 피하는 직각 연결선, 경유점, 조건부 선행 관계, 자료 출처·버전·확인 기록, 변경 영향 추적.
-- 🤖 **AI 에이전트 친화적** — 104개 명령을 CLI와 MCP(stdio)로 제공해 Claude·Codex 같은 에이전트가 문서를 만들고 편집할 수 있습니다.
-- 📤 **어디로든 내보내기** — PNG·SVG·PDF(벡터 글꼴)·편집 가능한 PPTX·HTML·CSV·draw.io.
+Place shapes, text, notes and images on a large sheet and connect them to explain **where each piece of information comes from and what it is a prerequisite for**. It is designed around pasting screenshots and annotating them.
 
-## 주요 기능
+- 🪶 **Lightweight** — one Windows WebView2 executable or a native WKWebView app on macOS. No Node server or bundled Chromium, and nothing is redrawn while you are not editing.
+- 🔒 **Local-first** — editing, saving and exporting all happen on your computer. OCR uses Windows OCR or Apple Vision locally; AI requests and LAN collaboration use the network only when you turn them on.
+- 🧭 **Relationship-centric** — orthogonal connectors that route around obstacles, waypoints, conditional prerequisites, source/version/verification records and change-impact tracing.
+- 🤖 **Agent-friendly** — 104 commands exposed through a CLI and an MCP (stdio) server, so agents such as Claude or Codex can create and edit documents.
+- 📤 **Export anywhere** — PNG, SVG, PDF (vector text), editable PPTX, HTML, CSV and draw.io.
 
-| 분야 | 지원 범위 |
+## Features
+
+| Area | Supported |
 | --- | --- |
-| 작업지 | 포인터 기준 확대·축소, Space+드래그 이동, 전체 보기, 미니맵, 격자·요소 맞춤 |
-| 요소 | 사각형, 둥근 사각형, 타원, 마름모, 텍스트, 메모, 이미지(자르기·회전), 표, 체크리스트, 영역 상자, 자유 그리기 |
-| 연결 | 직각·직선·곡선, 장애물 우회, 경유점 최대 32개, 라벨, 색·점선·두께, 단방향·양방향 화살표 |
-| 정리 | 정렬·같은 간격, 중첩 그룹, 페이지·레이어, 좌→우·위→아래·트리·방사형·담당자별 자동 배치(미리보기 후 적용) |
-| 자료 추적 | 출처·버전·담당자·기한·원본 지문, 사용자 정의 필드, 조건부 선행 관계, 준비 상태·누락·변경 영향 분석 |
-| 문서 | 여러 문서 탭, 문서 카드로 다른 `.agentsketch` 연결, 첨부 파일, 스냅샷·보관 버전, 댓글·북마크·발표 모드 |
-| 보관 | 이미지가 포함된 `.agentsketch`(JSON), 최근 보드 자동 복구, 실행 취소·다시 실행 |
-| 가져오기·내보내기 | PNG, SVG, PDF, PPTX, HTML, CSV, draw.io / CSV·draw.io 가져오기 |
+| Canvas | Pointer-anchored zoom, Space+drag panning, fit to view, minimap, grid and object snapping |
+| Elements | Rectangle, rounded rectangle, ellipse, diamond, text, note, image (crop/rotate), table, checklist, frame, freehand drawing |
+| Connectors | Orthogonal, straight and curved; obstacle avoidance; up to 32 waypoints; labels; color, dash and width; one- or two-way arrows |
+| Organizing | Align and distribute, nested groups, pages and layers, auto layout (left→right, top→down, tree, radial, by owner) with preview before applying |
+| Source tracking | Source, version, owner, due date and file fingerprint; custom fields; conditional prerequisites; readiness, missing-item and change-impact analysis |
+| Documents | Multiple document tabs, document cards linking other `.agentsketch` files, attachments, snapshots and stored versions, comments, bookmarks, presentation mode |
+| Storage | `.agentsketch` (JSON with embedded images), autosave recovery of the latest board, undo/redo |
+| Import / export | PNG, SVG, PDF, PPTX, HTML, CSV, draw.io / import from CSV and draw.io |
 
-전체 조작과 단축키는 [사용안내](docs/사용안내.md), 구현 범위와 제약은 [업그레이드 범위](docs/업그레이드범위.md)를 참고하세요.
+Full operations and shortcuts are in the [user guide](docs/사용안내.md); scope and limitations in [upgrade scope](docs/업그레이드범위.md) (both Korean).
 
-## 설치
+## Install
 
-### 실행 파일 (권장)
+### Executable (recommended)
 
-[Releases](https://github.com/devjay4561/AgentSketch/releases/latest)에서 `AgentSketch-Windows.zip`을 내려받아 압축을 풀고 `AgentSketch.exe`를 실행합니다.
+Download `AgentSketch-Windows.zip` from [Releases](https://github.com/devjay4561/AgentSketch/releases/latest), extract it and run `AgentSketch.exe`.
 
-- Windows 10/11 x64, [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (Windows 11에는 기본 포함)
-- 코드 서명이 없는 빌드라 처음 실행할 때 SmartScreen 경고가 나올 수 있습니다. 함께 게시한 `SHA256SUMS.txt`로 파일을 확인하세요.
+- Windows 10/11 x64 with the [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/) (preinstalled on Windows 11).
+- Builds are not code-signed, so SmartScreen may warn on first launch. Verify downloads with the published `SHA256SUMS.txt`.
 
 ### macOS
 
-Releases에서 `AgentSketch-macOS-universal.zip`을 내려받아 `AgentSketch.app`을 응용 프로그램 폴더로 옮기세요. Apple Silicon과 Intel Mac용 범용 앱을 제공합니다. 범용 빌드가 준비되지 않은 릴리스에는 Apple Silicon용 `AgentSketch-macOS-arm64.zip`을 게시합니다.
+Download `AgentSketch-macOS-universal.zip` from [Releases](https://github.com/devjay4561/AgentSketch/releases/latest), move `AgentSketch.app` to Applications, then launch it. Universal builds support Apple Silicon and Intel Macs; if a universal build is unavailable, use the arm64 archive on Apple Silicon.
 
-- macOS 12 이상이 필요합니다. OCR은 Apple Vision으로 이 Mac에서 처리하며, 인식 가능한 언어는 설치된 macOS Vision 언어에 따릅니다.
-- 앱은 Developer ID 인증서 서명과 공증을 거치지 않았습니다. Gatekeeper가 처음 실행을 막으면 다운로드한 파일을 확인한 뒤 **시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기**를 선택하세요. 자세한 내용은 [Apple 안내](https://support.apple.com/en-sg/102445)를 참고하세요.
+- Requires macOS 12 or newer. OCR runs locally with Apple Vision and uses the recognition languages supported by macOS.
+- The app has no Developer ID signature and is not notarized. If Gatekeeper blocks the first launch, verify the download and choose **System Settings → Privacy & Security → Open Anyway**. See [Apple's instructions](https://support.apple.com/en-sg/102445).
 
-### 🤖 AI 에이전트에게 설치 맡기기
+### 🤖 Let your AI agent install it
 
-Claude Code, Codex, GJC 같은 에이전트에게 아래 문장을 그대로 붙여 넣으세요. 에이전트가 [설치 안내](docs/agent-install.md)를 읽고 다운로드·검증·MCP 등록·스킬 설치·연결 확인까지 진행합니다. 설치 위치와 작업 폴더는 시작 전에 사용자에게 묻습니다.
+Paste this into Claude Code, Codex, GJC or another agent. It reads the [agent install guide](docs/agent-install.md) and downloads, verifies, registers the MCP server, installs the skill and checks the connection. It asks you for the install and working folders first.
 
 ```text
-AgentSketch를 설치하고 너에게 MCP로 연결해 줘.
-https://raw.githubusercontent.com/devjay4561/AgentSketch/main/docs/agent-install.md 의 절차를 순서대로 따라 줘.
+Install AgentSketch and connect it to yourself over MCP.
+Follow https://raw.githubusercontent.com/devjay4561/AgentSketch/main/docs/agent-install.md step by step.
 ```
 
-Node.js 24 이상이 필요합니다. 연결되면 "AgentSketch 앱에 ○○ 흐름도를 그려 줘"처럼 요청하면 됩니다.
+Requires Node.js 24 or newer. Once connected, ask something like "draw a flowchart of … in the AgentSketch app".
 
-### 처음 해보기
+### First steps
 
-1. **파일 → 새 보드**를 선택합니다.
-2. 왼쪽 도구로 사각형·텍스트·메모를 작업지에 클릭하거나 드래그해 놓습니다.
-3. 화면 캡처를 **Ctrl+V (Windows) / ⌘V (Mac)**로 붙여넣거나 이미지 파일을 끌어다 놓습니다.
-4. **연결선** 도구로 시작 요소와 도착 요소를 차례로 클릭합니다.
-5. **Ctrl+S (Windows) / ⌘S (Mac)**로 `.agentsketch` 파일을 저장하고, **내보내기**로 공유용 파일을 만듭니다.
+1. Choose **File → New board** (파일 → 새 보드).
+2. Pick rectangle, text or note in the left toolbar and click or drag on the canvas.
+3. Paste a screenshot with **Ctrl+V on Windows** or **⌘V on Mac**, or drop an image file onto the canvas.
+4. With the **connector** tool, click the source element and then the target.
+5. Save a `.agentsketch` file with **Ctrl+S on Windows** or **⌘S on Mac**, and use **Export** (내보내기) for shareable files.
 
 > [!IMPORTANT]
-> **자동 복구와 파일 저장은 별개입니다.** Windows는 `%APPDATA%\AgentSketch`, macOS는 `~/Library/Application Support/AgentSketch`에 최근 보드를 자동 복구용으로 보관합니다. 여러 보드를 보관하거나 다른 PC로 옮기려면 반드시 파일로 저장하세요.
+> **Autosave is not the same as saving a file.** Windows stores recovery under `%APPDATA%\AgentSketch`; macOS stores it under `~/Library/Application Support/AgentSketch`. To keep several boards or move them to another PC, save a document file.
 
-## AI 에이전트로 제어하기
+## Controlling it with AI agents
 
-앱의 문서 엔진을 CLI와 MCP 서버로도 사용할 수 있습니다. 별도 AI API 키는 필요 없고, 사용하는 에이전트가 명령을 작성합니다.
+The app's document engine is also available as a CLI and an MCP server. No AI API key is needed — your agent writes the commands.
 
 ```powershell
-agentsketch.cmd capabilities --query node           # 사용 가능한 명령 검색
-agentsketch.cmd execute --request 요청.json --root C:\work
-agentsketch.cmd connect                              # 실행 중인 앱 화면에 연결 (상단에 "외부 제어 중" 표시)
+agentsketch.cmd capabilities --query node           # discover commands
+agentsketch.cmd execute --request request.json --root C:\work
+agentsketch.cmd connect                              # attach to the running app (shows an "external control" banner)
 ```
 
-macOS에서는 앱 번들에 포함된 실행 래퍼를 사용합니다.
+On macOS, use the wrapper included in the app bundle:
 
 ```sh
 "/Applications/AgentSketch.app/Contents/Resources/agentsketch" capabilities --query node
@@ -110,112 +115,112 @@ macOS에서는 앱 번들에 포함된 실행 래퍼를 사용합니다.
 ```
 
 ```jsonc
-// MCP 호스트 설정 예시 (에이전트별 등록 명령은 docs/agent-install.md)
-{ "mcpServers": { "agentsketch": { "command": "node", "args": ["<배포 폴더>/AI/ai/cli.mjs", "mcp", "--root", "C:\\work"] } } }
+// MCP host configuration (per-agent commands: docs/agent-install.md)
+{ "mcpServers": { "agentsketch": { "command": "node", "args": ["<release folder>/AI/ai/cli.mjs", "mcp", "--root", "C:\\work"] } } }
 ```
 
-- 모든 변경은 batch 단위로 원자적으로 적용되고, `dryRun`으로 계획만 확인할 수 있습니다. 화면에서는 Ctrl+Z 한 번으로 되돌립니다.
-- 앱 연결은 `127.0.0.1` 임의 포트와 세션 토큰을 사용하며 웹사이트 Origin을 거부합니다.
-- CLI/MCP는 Node.js 24 이상, 미리보기·내보내기 렌더에는 Windows의 Microsoft Edge 또는 Mac에 설치된 Chrome/Edge가 필요합니다.
+- Changes are applied atomically per batch; `dryRun` returns the plan only. In the app, one Ctrl+Z undoes a whole batch.
+- The live connection uses a random `127.0.0.1` port with a session token and rejects website origins.
+- The CLI/MCP requires Node.js 24+; previews and exports render with Microsoft Edge on Windows or installed Chrome/Edge on macOS.
 
-자세한 기능 대응표는 [AI 사용안내](docs/AI-사용안내.md)를 참고하세요.
+The full command map is in [AI-사용안내.md](docs/AI-사용안내.md) (Korean).
 
-## 소스에서 빌드
+## Build from source
 
-**요구 사항:** Go 1.26+, Node.js 24 LTS, npm. Windows 빌드는 Windows 10/11이, Mac 빌드는 macOS 12+와 Xcode Command Line Tools가 필요합니다. 최초 빌드는 의존성과 Wails CLI(v2.17.0)를 내려받습니다.
+**Requirements:** Go 1.26+, Node.js 24 LTS, npm. Windows builds need Windows 10/11; macOS builds need macOS 12+ and Xcode Command Line Tools. The first build downloads dependencies and the Wails CLI (v2.17.0).
 
 ```powershell
 git clone https://github.com/devjay4561/AgentSketch.git
 cd AgentSketch
-./scripts/build.ps1          # npm ci → 프런트엔드 빌드 → 테스트 → build/bin/AgentSketch.exe
+./scripts/build.ps1          # npm ci → frontend build → tests → build/bin/AgentSketch.exe
 ./scripts/package.ps1        # release/AgentSketch-Windows.zip, release/AgentSketch-source.zip
 ```
 
-macOS 터미널에서는 다음을 실행합니다.
+On macOS, build either Apple Silicon or universal binaries and package the app:
 
 ```sh
-./scripts/build.sh --arch arm64       # Apple Silicon .app
-./scripts/build.sh --arch universal   # arm64 + Intel 범용 .app
-./scripts/package-macos.sh            # .app ZIP과 DMG
+./scripts/build.sh --arch arm64
+./scripts/build.sh --arch universal
+./scripts/package-macos.sh           # app ZIP and DMG
 ```
 
-Wails CLI는 프로젝트의 `.tools/bin`에만 설치합니다. 사용자별 설치 파일(NSIS) 빌드는 [scripts/INSTALLER.md](scripts/INSTALLER.md)를 참고하세요.
+The Wails CLI is installed only into the project's `.tools/bin`. For the per-user NSIS installer see [scripts/INSTALLER.md](scripts/INSTALLER.md).
 
-### 개발
+### Development
 
 ```powershell
 npm ci
-npm run dev -- --port 18440  # 브라우저 개발 모드 (저장은 다운로드, 복구는 브라우저 저장소 사용)
+npm run dev -- --port 18440  # browser dev mode (save = download, recovery = browser storage)
 ```
 
-| 검사 | 명령 |
+| Check | Command |
 | --- | --- |
-| 타입 검사·프런트엔드 빌드 | `npm run build` |
-| 문서·배치·경로·내보내기 단위 테스트 | `npm test` |
-| Go 테스트 | `go test ./...` |
-| WebView2 보호 인자 패치 | `go test github.com/wailsapp/go-webview2/pkg/edge -run AgentSketch` |
-| UI 회귀 (개발 서버 18440 실행 중) | `node scripts/e2e-check.mjs`, `node scripts/editor-regressions.mjs` |
-| 직각 경로·그룹 UI | `node --experimental-strip-types scripts/routing-group-check.mjs` |
+| Type check + frontend build | `npm run build` |
+| Document, layout, routing and export unit tests | `npm test` |
+| Go tests | `go test ./...` |
+| WebView2 browser-argument patch | `go test github.com/wailsapp/go-webview2/pkg/edge -run AgentSketch` |
+| UI regressions (dev server on 18440) | `node scripts/e2e-check.mjs`, `node scripts/editor-regressions.mjs` |
+| Orthogonal routing and group UI | `node --experimental-strip-types scripts/routing-group-check.mjs` |
 
-UI 검사는 설치된 Microsoft Edge와 Playwright를 사용합니다.
+UI checks use the installed Microsoft Edge with Playwright.
 
-## 아키텍처
+## Architecture
 
 ```text
 ┌──────────────── AgentSketch (Go + Wails v2; WebView2 / WKWebView) ────────────────┐
-│  main.go / app.go       창·단일 인스턴스·종료 전 복구 저장                       │
-│  store.go / export.go   파일 선택·저장·복구·내보내기 쓰기                          │
-│  ocr_windows.go / ocr_darwin.go  Windows OCR / Apple Vision (요청 시)             │
-│  collaboration.go / ai.go   LAN 공유·외부 AI 요청 (사용자가 켤 때만)             │
-│ ┌───────────────── WebView2 (임베드된 dist/) ─────────────────┐                  │
-│ │ src/main.ts         편집 조작·선택·단축키·패널                 │                  │
-│ │ src/model.ts        문서 검증·이력      src/types.ts  문서 계약 │                  │
-│ │ src/routing.ts      직각 경로 탐색      src/layout-engine.ts  │                  │
-│ │ src/renderer.ts     Canvas 2D 표시·PNG·SVG  src/export-*.ts   │                  │
-│ └───────────────────────────────────────────────────────────────┘                │
+│  main.go / app.go       window, single instance, recovery save before exit        │
+│  store.go / export.go   file dialogs, save, recovery, export writes              │
+│  ocr_windows.go / ocr_darwin.go  Windows OCR / Apple Vision (on request)          │
+│  collaboration.go / ai.go   LAN sharing, external AI requests (opt-in only)       │
+│ ┌───────────────── WebView2 (embedded dist/) ──────────────────┐                 │
+│ │ src/main.ts         editing, selection, shortcuts, panels     │                 │
+│ │ src/model.ts        validation, history  src/types.ts  format │                 │
+│ │ src/routing.ts      orthogonal routing   src/layout-engine.ts │                 │
+│ │ src/renderer.ts     Canvas 2D, PNG, SVG  src/export-*.ts      │                 │
+│ └────────────────────────────────────────────────────────────────┘                │
 └─────────────────────────────────────────────────────────────────────────────────┘
-        ▲ 127.0.0.1 + 세션 토큰 (connect 시)
-ai/cli.mjs ── CLI · MCP stdio ── 같은 문서 엔진(src/commands.ts)을 오프라인 파일에도 사용
+        ▲ 127.0.0.1 + session token (when connected)
+ai/cli.mjs ── CLI · MCP stdio ── same document engine (src/commands.ts), also for offline files
 ```
 
-| 경로 | 역할 |
+| Path | Role |
 | --- | --- |
-| `src/` | TypeScript 편집기, 문서 엔진, 렌더러, 내보내기 |
-| `*.go` | 공통 데스크톱 앱과 build tag로 구분한 Windows/macOS 네이티브 동작 |
-| `ai/` | CLI 및 MCP 서버 |
-| `skills/agentsketch/` | AI 에이전트용 스킬 |
-| `scripts/` | 빌드·패키징·설치 파일·UI 검사 |
-| `third_party/go-webview2/` | 브라우저 인자 전달을 위한 고정 패치 ([설명](third_party/go-webview2/AGENTSKETCH-PATCH.md)) |
+| `src/` | TypeScript editor, document engine, renderer, exporters |
+| `*.go` | Shared desktop app plus tagged Windows/macOS native adapters |
+| `ai/` | CLI and MCP server |
+| `skills/agentsketch/` | Skill for AI agents |
+| `scripts/` | Build, packaging, installer and UI checks |
+| `third_party/go-webview2/` | Pinned patch that passes browser arguments ([details](third_party/go-webview2/AGENTSKETCH-PATCH.md)) |
 
-### 설계 원칙
+### Design principles
 
-- **지속 렌더 루프 없음** — 변경이 있을 때만 다시 그리고, 화면 밖 요소는 그리지 않습니다.
-- **메모리 예산** — 이미지 문자열은 실행 취소 이력에서 공유하고 디코딩 캐시는 제한합니다. 화면에는 중앙에 가까운 이미지 최대 64개를 우선 표시하며, 저장·내보내기에는 모두 포함됩니다.
-- **GPU 기본 비활성화** — 측정한 Canvas 2D 작업에서 메모리와 확대·축소 응답성이 함께 좋아졌습니다. `AGENTSKETCH_ENABLE_GPU=1`로 켤 수 있습니다.
-- **무거운 기능은 필요할 때** — PDF/PPTX 모듈, OCR, 공유는 사용할 때 불러옵니다.
-- **문서 계약** — `.agentsketch` 형식은 [`src/types.ts`](src/types.ts)와 `validateDocument`가 정의합니다.
+- **No continuous render loop** — redraw only on change; skip off-screen elements.
+- **Memory budget** — image strings are shared across undo history and the decode cache is bounded. Up to 64 images nearest the center are drawn on screen; saving and exporting always include every image.
+- **GPU off by default** — on the measured Canvas 2D workload this improved both memory and zoom responsiveness. Set `AGENTSKETCH_ENABLE_GPU=1` to turn it on.
+- **Heavy features on demand** — PDF/PPTX modules, OCR and sharing load only when used.
+- **Document contract** — the `.agentsketch` format is defined by [`src/types.ts`](src/types.ts) and `validateDocument`.
 
-측정 조건과 수치는 [검증결과](docs/검증결과.md), 디자인 근거는 [DESIGN.md](DESIGN.md)에 있습니다.
+Measurement conditions and numbers are in [검증결과.md](docs/검증결과.md); design rationale in [DESIGN.md](DESIGN.md) (both Korean).
 
-## 개인정보와 보안
+## Privacy and security
 
-- 문서와 자동 복구 파일은 로컬에만 저장됩니다. AgentSketch는 텔레메트리나 자동 업데이트 요청을 보내지 않습니다.
-- 외부 AI는 사용자가 서비스 주소·모델·키를 설정하고 전송 내용을 확인한 뒤에만 요청합니다.
-- 취약점은 공개 이슈 대신 [보안 정책](SECURITY.md)에 따라 비공개로 제보해 주세요.
+- Documents and recovery files stay on your PC. AgentSketch sends no telemetry and makes no automatic update requests.
+- External AI is called only after you configure the endpoint, model and key and review what will be sent.
+- Please report vulnerabilities privately as described in the [security policy](SECURITY.md), not in public issues.
 
-## 기여
+## Contributing
 
-버그 제보, 기능 제안, PR 모두 환영합니다. 시작하기 전에 [CONTRIBUTING.md](CONTRIBUTING.md)와 [행동 강령](CODE_OF_CONDUCT.md)을 읽어 주세요.
+Bug reports, feature ideas and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md) first. Issues and PRs may be written in English or Korean.
 
-## 라이선스
+## License
 
 [MIT](LICENSE) © AgentSketch contributors
 
-함께 배포하는 서드파티 구성 요소:
+Bundled third-party components:
 
-- [Pretendard](https://github.com/orioncactus/pretendard) v1.3.9 — SIL Open Font License 1.1 ([public/fonts/OFL.txt](public/fonts/OFL.txt)). PDF용 정적 파생 글꼴은 예약 글꼴 이름을 피해 *AgentSketch Export Sans*로 이름을 바꿨습니다.
+- [Pretendard](https://github.com/orioncactus/pretendard) v1.3.9 — SIL Open Font License 1.1 ([public/fonts/OFL.txt](public/fonts/OFL.txt)). The static PDF fonts derived from it are renamed *AgentSketch Export Sans* to respect the Reserved Font Name.
 - [Wails](https://github.com/wailsapp/wails), [go-webview2](https://github.com/wailsapp/go-webview2) — MIT
-- [pdf-lib](https://github.com/Hopding/pdf-lib), [PptxGenJS](https://github.com/gitbrent/PptxGenJS), [Playwright](https://github.com/microsoft/playwright) 등 npm 의존성 — 각 라이선스
-- 설치 파일 [NSIS](https://nsis.sourceforge.io/) — zlib/libpng 등 ([scripts/NSIS-LICENSE.txt](scripts/NSIS-LICENSE.txt))
+- npm dependencies such as [pdf-lib](https://github.com/Hopding/pdf-lib), [PptxGenJS](https://github.com/gitbrent/PptxGenJS) and [Playwright](https://github.com/microsoft/playwright) — under their respective licenses
+- Installer built with [NSIS](https://nsis.sourceforge.io/) — zlib/libpng and others ([scripts/NSIS-LICENSE.txt](scripts/NSIS-LICENSE.txt))
 
-배포 ZIP에는 모든 의존성 고지를 모은 `THIRD-PARTY-NOTICES.txt`가 포함됩니다.
+Release archives include `THIRD-PARTY-NOTICES.txt` with every dependency notice.

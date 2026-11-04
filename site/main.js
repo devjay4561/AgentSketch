@@ -10,10 +10,10 @@
 
   /* ---------------- i18n ---------------- */
   const EN = {
-    skip: 'Skip to content', navLabel: 'Page', navProof: 'How it works', navFeatures: 'Features', navAgent: 'AI agents', navDownload: 'Download',
+    platform: 'Download OS', skip: 'Skip to content', navLabel: 'Page', navProof: 'How it works', navFeatures: 'Features', navAgent: 'AI agents', navDownload: 'Download',
     heroTitle: 'Scattered screenshots,<br />one clear flow.',
     heroLede: 'Paste your captures and hand them to an AI agent. Claude or Codex connects to the AgentSketch app and draws the shapes, routes the connectors and tidies the layout.',
-    ctaDownload: 'Download for Windows / macOS', ctaSource: 'View source', metaFree: 'MIT open source', scrollHint: 'Scroll and the agent tidies up',
+    ctaSource: 'View source', metaFree: 'MIT open source', scrollHint: 'Scroll and the agent tidies up',
     stageAria: 'Example scene: an AI agent turns scattered screenshots into a flowchart', winTitle: 'Launch prep.agentsketch', winPill: 'External control',
     capDesignCh: 'design', capDesignWho: 'Mina', capDesignMsg: 'Final mockups v3 are up', capDesignWho2: 'Joon', capDesignMsg2: 'Contrast checked!',
     nodeDesign: 'Design mockups', capDevDone: 'Done', capDevTitle: 'Fix checkout bug and improve alerts', nodeDev: 'Feature build',
@@ -39,16 +39,16 @@
     g1t: 'Applied together, undone together', g1d: 'Changes land as one batch and one Ctrl+Z in the app reverts them. dryRun returns the plan only.',
     g2t: 'Connected only on this PC', g2d: 'A random 127.0.0.1 port with a session token; requests from websites are rejected.',
     g3t: 'Work you can see', g3d: 'While connected, the app shows “External control” at the top. Click it to disconnect.',
-    localTitle: 'No installer wizard, no account, no cloud. <em>One 22 MB executable</em> does it all on your PC.',
+    localTitle: 'No account, no cloud. Work locally with a Windows executable or a macOS app.',
     localSub: 'Documents and recovery files stay on your PC. No telemetry or update pings; OCR, external AI and LAN collaboration use the network only when you turn them on.',
     closeTitle: 'Download it and draw your first flow.', ctaStar: 'Star on GitHub',
     reqOs: 'Requirements', reqOsD: 'Windows 10/11 x64 or macOS 12+', reqAi: 'AI agents', reqAiD: 'Node.js 24+, Edge on Windows or Chrome/Edge on macOS',
-    reqSign: 'Signing', reqSignD: 'Builds are not code-signed, so SmartScreen may warn on first launch.', reqSha: 'Verify with SHA256',
+    reqSign: 'Signing', reqSignD: 'Windows may show SmartScreen warnings. macOS uses an ad-hoc signature without Developer ID signing or notarization; Gatekeeper may block first launch.', reqSha: 'Verify with SHA256',
     footLabel: 'Footer', footReleases: 'Releases', footGuide: 'User guide (KO)', footSecurity: 'Security', footLicense: 'MIT License · Font based on Pretendard (SIL OFL)',
   };
   const META = {
-    ko: { title: document.title, desc: $('meta[name="description"]').content, typed: '흩어진 캡처들, 출시 흐름으로 정리해줘', count: (n, e) => `${n}개 요소 · ${e}개 연결`, toggle: 'EN', toggleAria: 'Switch to English', size: mb => `ZIP ${mb} MB` },
-    en: { title: 'AgentSketch · Scattered screenshots, one clear flow', desc: 'An offline flowchart editor for Windows and macOS that AI agents can control.', typed: 'Turn these screenshots into a launch flow', count: (n, e) => `${n} elements · ${e} connectors`, toggle: '한국어', toggleAria: '한국어로 보기', size: mb => `Windows ZIP ${mb} MB` },
+    ko: { title: document.title, desc: $('meta[name="description"]').content, typed: '흩어진 캡처들, 출시 흐름으로 정리해줘', count: (n, e) => `${n}개 요소 · ${e}개 연결`, toggle: 'EN', toggleAria: 'Switch to English' },
+    en: { title: 'AgentSketch · Scattered screenshots, one clear flow', desc: 'An offline flowchart editor for Windows and macOS that AI agents can control.', typed: 'Turn these screenshots into a launch flow', count: (n, e) => `${n} elements · ${e} connectors`, toggle: '한국어', toggleAria: '한국어로 보기' },
   };
   const KO = new Map();
   $$('[data-k]').forEach(el => KO.set(el, el.innerHTML));
@@ -67,7 +67,7 @@
     const t = $('[data-lang-toggle]');
     $('[data-lang-label]', t).textContent = m.toggle;
     t.setAttribute('aria-label', m.toggleAria);
-    if (release.mb) $$('[data-size]').forEach(el => (el.textContent = m.size(release.mb)));
+    renderDownload();
     try { localStorage.setItem('fp-lang', lang); } catch (e) {}
     lastP = -1; schedule();
     if (typeof typePrompt === 'function') typePrompt();
@@ -75,15 +75,49 @@
   $('[data-lang-toggle]').addEventListener('click', () => applyLang(lang === 'en' ? 'ko' : 'en'));
 
   /* ---------------- latest release ---------------- */
-  const release = { mb: 0 };
+  const releasesURL = 'https://github.com/devjay4561/AgentSketch/releases';
+  // Pinned published assets keep both downloads working when the API is unavailable.
+  const downloads = {
+    windows: { tag: 'v0.1.2', name: 'AgentSketch-Windows.zip', size: 19516686,
+      browser_download_url: `${releasesURL}/download/v0.1.2/AgentSketch-Windows.zip` },
+    macos: { tag: 'v0.1.2', name: 'AgentSketch-macOS-universal.zip', size: 28639511,
+      browser_download_url: `${releasesURL}/download/v0.1.2/AgentSketch-macOS-universal.zip` },
+  };
+  const platform = navigator.userAgentData?.platform || navigator.platform || '';
+  const mobile = navigator.userAgentData?.mobile || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let selectedOS = mobile ? '' : /Win/i.test(platform) ? 'windows' : /Mac/i.test(platform) ? 'macos' : '';
+
+  function renderDownload() {
+    const asset = downloads[selectedOS];
+    $$('[data-platform]').forEach(el => { el.value = selectedOS; });
+    const label = !selectedOS ? (lang === 'en' ? 'Choose an OS' : 'OS를 선택하세요') : !asset
+      ? (lang === 'en' ? 'View available releases' : '게시된 릴리스 보기')
+      : `${selectedOS === 'macos' ? 'macOS' : 'Windows'} ZIP · ${(asset.size / 1048576).toFixed(1)} MB`;
+    $$('[data-download-label]').forEach(el => { el.textContent = label; });
+    $$('[data-download]').forEach(el => { el.href = asset?.browser_download_url || (selectedOS ? releasesURL : '#download'); });
+    $$('[data-release]').forEach(el => { el.textContent = asset?.tag || '—'; });
+    const info = !selectedOS ? (lang === 'en' ? 'Choose Windows or macOS. Other platforms are not supported.' : 'Windows 또는 macOS를 선택하세요. 다른 OS는 지원하지 않습니다.')
+      : !asset ? (lang === 'en' ? 'No verified download is available here. Check GitHub Releases.' : '여기서 확인된 다운로드가 없습니다. GitHub Releases를 확인하세요.')
+      : selectedOS === 'macos' ? (lang === 'en' ? 'macOS 12+ · Apple Silicon and Intel. Extract the ZIP and move AgentSketch.app to Applications. Not notarized: if blocked, verify the download and use Privacy & Security → Open Anyway.' : 'macOS 12+ · Apple Silicon 및 Intel. ZIP을 풀고 AgentSketch.app을 응용 프로그램으로 옮기세요. 공증되지 않은 앱입니다. 차단되면 파일을 확인한 뒤 개인정보 보호 및 보안 → 그래도 열기를 사용하세요.')
+      : (lang === 'en' ? 'Windows 10/11 x64 · WebView2 required. Extract the ZIP and run AgentSketch.exe. SmartScreen may warn.' : 'Windows 10/11 x64 · WebView2 필요. ZIP을 풀고 AgentSketch.exe를 실행하세요. SmartScreen 경고가 표시될 수 있습니다.');
+    $$('[data-download-info]').forEach(el => { el.textContent = info; });
+    const checksum = $('[data-k="reqSha"]');
+    checksum.href = asset ? `${releasesURL}/download/${asset.tag}/SHA256SUMS.txt` : releasesURL;
+  }
+  $$('[data-platform]').forEach(el => el.addEventListener('change', () => { selectedOS = el.value; renderDownload(); }));
+  renderDownload();
   fetch('https://api.github.com/repos/devjay4561/AgentSketch/releases/latest', { headers: { Accept: 'application/vnd.github+json' } })
-    .then(r => (r.ok ? r.json() : Promise.reject(r.status)))
+    .then(r => r.ok ? r.json() : Promise.reject(r.status))
     .then(data => {
-      const asset = (data.assets || []).find(a => a.name === 'AgentSketch-Windows.zip');
-      if (data.tag_name) $$('[data-release]').forEach(el => (el.textContent = data.tag_name));
-      if (asset) { release.mb = (asset.size / 1048576).toFixed(1); $$('[data-size]').forEach(el => (el.textContent = META[lang].size(release.mb))); }
+      if (data.draft || data.prerelease || !data.tag_name) return;
+      // Only universal Mac builds can be offered to both Intel and Apple Silicon.
+      for (const [os, name] of Object.entries({ windows: 'AgentSketch-Windows.zip', macos: 'AgentSketch-macOS-universal.zip' })) {
+        const asset = (data.assets || []).find(a => a.name === name && a.state === 'uploaded' && a.size > 0);
+        if (asset && asset.browser_download_url === `${releasesURL}/download/${data.tag_name}/${name}`) downloads[os] = { ...asset, tag: data.tag_name };
+      }
+      renderDownload();
     })
-    .catch(() => { /* Static fallback text stays. */ });
+    .catch(() => { /* Keep only previously verified downloads and the releases fallback. */ });
 
   /* ---------------- hero: scroll-scrubbed tidy ---------------- */
   const stage = $('[data-stage]');
