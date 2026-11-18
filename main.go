@@ -58,6 +58,7 @@ func main() {
 		BackgroundColour:                 &options.RGBA{R: 246, G: 247, B: 249, A: 255},
 		EnableFraudulentWebsiteDetection: true,
 		AssetServer:                      &assetserver.Options{Assets: assets},
+		DragAndDrop:                      &options.DragAndDrop{EnableFileDrop: true},
 		OnStartup:                        app.startup, OnBeforeClose: app.beforeClose, OnShutdown: func(ctx context.Context) { _ = app.DisableAutomation() },
 		Bind: []interface{}{app},
 		SingleInstanceLock: &options.SingleInstanceLock{

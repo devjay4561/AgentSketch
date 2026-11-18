@@ -395,7 +395,7 @@ func (a *App) AutosaveForDocument(data string, path string) error {
 		return err
 	}
 	if path == "" {
-		return nil
+		return a.store.SetRecoveryPath("")
 	}
 	recent, err := a.documents.Recent()
 	if err != nil {
@@ -403,6 +403,9 @@ func (a *App) AutosaveForDocument(data string, path string) error {
 	}
 	for _, entry := range recent {
 		if pathKey(entry.Path) == pathKey(path) {
+			if err := a.store.SetRecoveryPath(entry.Path); err != nil {
+				return err
+			}
 			return a.documents.RecoverForPath(entry.Path, []byte(data))
 		}
 	}

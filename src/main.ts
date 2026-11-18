@@ -33,6 +33,7 @@ type DesktopApp = {
   RequestRestart(): Promise<void>;
   CancelRestart?(): Promise<void>;
   GetRestartDocumentPath?(): Promise<string | null>;
+  LoadAutosavePath?(): Promise<string>;
   TakeLaunchDocument?(): Promise<LaunchDocument | null>;
   OpenRecentDocument(path: string): Promise<LaunchDocument>;
   SetActiveDocumentPath(path: string): Promise<void>;
@@ -595,7 +596,15 @@ let dragDepth = 0;
 wrap.addEventListener('dragenter', e => { if (e.dataTransfer?.types.includes('Files')) { e.preventDefault(); dragDepth++; $('drop-overlay').hidden = false; } });
 wrap.addEventListener('dragleave', () => { dragDepth--; if (dragDepth <= 0) $('drop-overlay').hidden = true; });
 wrap.addEventListener('dragover', e => { e.preventDefault(); });
-wrap.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('drop-overlay').hidden = true; const files = [...e.dataTransfer?.files || []]; if (files.length === 1 && /\.(agentsketch|flowpaper|json)$/i.test(files[0].name)) void openDropped(files[0]); else void addImages(files, worldPoint(e)); });
+// In the desktop app a dropped document is opened natively with its real path (agentsketch:open-file),
+// so Ctrl+S saves back to it. The browser read is only a fallback when no native open arrives.
+let droppedFallback: ReturnType<typeof setTimeout> | undefined;
+wrap.addEventListener('drop', e => { e.preventDefault(); dragDepth = 0; $('drop-overlay').hidden = true; const files = [...e.dataTransfer?.files || []];
+  if (files.length === 1 && /\.(agentsketch|flowpaper|json)$/i.test(files[0].name)) {
+    const file = files[0];
+    if (isNative && !/\.json$/i.test(file.name)) { clearTimeout(droppedFallback); droppedFallback = setTimeout(() => void openDropped(file), 1500); }
+    else void openDropped(file);
+  } else void addImages(files, worldPoint(e)); });
 
 function isTyping(target: EventTarget | null) { return target instanceof HTMLElement && (target.matches('input,textarea,select') || target.isContentEditable); }
 async function guardReplace(): Promise<boolean> {
@@ -801,7 +810,8 @@ async function initialize() {
       doc = initial;
       dirty = !launch;
       toast(launch ? '문서 파일을 열었습니다.' : '이 PC에 저장된 마지막 작업을 복구했습니다.');
-      const path = launch?.path ?? restartPath;
+      // Recovered work that came from a saved file keeps that file, so Ctrl+S saves straight back to it.
+      const path = launch?.path ?? restartPath ?? (await desktop?.LoadAutosavePath?.().catch(() => '') || null);
       if (path && desktop) {
         try { await desktop.SetActiveDocumentPath(path); filePath = path; }
         catch (error) { toast(String(error), true); }
@@ -830,7 +840,8 @@ async function initialize() {
       if(command.startsWith('presentation.')){document.querySelector<HTMLButtonElement>(`[data-present="${command.split('.')[1]}"]`)?.click();return {active:document.body.classList.contains('fp-presenting')};}
       throw new CommandError('UNKNOWN_COMMAND',command);
     }});
-    const native = (window as unknown as { go: { main: { App: { Ready(): Promise<void>; CloseWithRecovery(data: string): Promise<void>;CloseWithRecoveryForDocument?(data:string,path:string):Promise<void> } } }; runtime: { EventsOn(name: string, fn: (restart?: boolean) => void): void } });
+    const native = (window as unknown as { go: { main: { App: { Ready(): Promise<void>; CloseWithRecovery(data: string): Promise<void>;CloseWithRecoveryForDocument?(data:string,path:string):Promise<void> } } }; runtime: { EventsOn(name: string, fn: (restart?: boolean) => void): void; OnFileDrop?(fn: () => void, useDropTarget: boolean): void } });
+    native.runtime.OnFileDrop?.(() => {}, false);
     native.runtime.EventsOn('agentsketch:closing', async restart => {
       if (closing) return;
       closing = true;
@@ -852,7 +863,7 @@ async function initialize() {
         toast(`작업을 보존하지 못해 종료를 멈췄습니다. 파일로 저장하세요. ${String(error)}`, true);
       } finally { closing = false; }
     });
-    native.runtime.EventsOn('agentsketch:open-file',()=>{void (async()=>{try{const result=await (window as any).go.main.App.TakeLaunchDocument();if(result&&await guardReplace()){replaceDocument(validateDocument(JSON.parse(result.data)),result.path);fit();}}catch(error){toast(`파일을 열지 못했습니다. ${String(error)}`,true);}})();});
+    native.runtime.EventsOn('agentsketch:open-file',()=>{clearTimeout(droppedFallback);void (async()=>{try{const result=await (window as any).go.main.App.TakeLaunchDocument();if(result&&await guardReplace()){replaceDocument(validateDocument(JSON.parse(result.data)),result.path);fit();}}catch(error){toast(`파일을 열지 못했습니다. ${String(error)}`,true);}})();});
     await native.go.main.App.Ready();
   }
 }

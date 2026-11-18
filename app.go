@@ -96,7 +96,10 @@ func (a *App) RequestRestart() error {
 
 func (a *App) CancelRestart() { a.restartRequested.Store(false) }
 
-func (a *App) startup(ctx context.Context) { a.ctx = ctx }
+func (a *App) startup(ctx context.Context) {
+	a.ctx = ctx
+	runtime.OnFileDrop(ctx, func(_, _ int, paths []string) { a.fileDropped(ctx, paths) })
+}
 
 func (a *App) secondInstance(data options.SecondInstanceData) {
 	if automationRequested(data.Args) {
@@ -253,7 +256,11 @@ func (a *App) Autosave(data string) error {
 	if err := a.store.Autosave([]byte(data)); err != nil {
 		return err
 	}
-	if path, ok := a.currentPath.Load().(string); ok && path != "" {
+	path, _ := a.currentPath.Load().(string)
+	if err := a.store.SetRecoveryPath(path); err != nil {
+		return err
+	}
+	if path != "" {
 		return a.documents.RecoverForPath(path, []byte(data))
 	}
 	return nil
