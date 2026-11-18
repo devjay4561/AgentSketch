@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import './style.css';
 import {installAutomation} from './automation-client.ts';
 import {runCommandInPlace,CommandError} from './commands.ts';
@@ -5,7 +6,9 @@ import {mountDocumentTabs} from './document-tabs.ts';
 import type {WorkbenchHost} from './workspace-types.ts';
 import {mountWorkbench} from './workbench.ts';
 import {projectVisibleDocument,editableNodeIds,groupMembers,topGroupId,DEFAULT_PAGE,createGroup,ungroup,reparentDroppedNodes} from './organization.ts';
-import {applyNodeDefaults,applyEdgeDefaults} from './style-defaults.ts';
+import {applyNodeDefaults,applyEdgeDefaults,DEFAULT_CONNECTOR} from './style-defaults.ts';
+import { mountStylePresetsPanel } from './style-presets-panel.ts';
+import { setGraphicsProfile } from './graphics.ts';
 import {addNextStep,splitConnection} from './diagram-actions.ts';
 import {setNodePlainText} from './rich-text.ts';
 import {compareDocuments} from './review-model.ts';
@@ -21,8 +24,23 @@ import { FONT_FAMILY, PALETTE } from './theme.ts';
 import { setupUIFeedback } from './ui-feedback.ts';
 import { installDomTranslation, lang, setLang, t } from './i18n.ts';
 
+type GraphicsSettings = { saved: boolean; active: boolean; envOverride: boolean };
+type LaunchDocument = { path: string; data: string };
+type DesktopApp = {
+  GetGraphicsSettings?(): Promise<GraphicsSettings>;
+  SetGPUEnabled(enabled: boolean): Promise<void>;
+  RequestRestart(): Promise<void>;
+  CancelRestart?(): Promise<void>;
+  GetRestartDocumentPath?(): Promise<string | null>;
+  TakeLaunchDocument?(): Promise<LaunchDocument | null>;
+  OpenRecentDocument(path: string): Promise<LaunchDocument>;
+  SetActiveDocumentPath(path: string): Promise<void>;
+};
+const desktop = (window as Window & { go?: { main?: { App?: DesktopApp } } }).go?.main?.App;
+
 installDomTranslation();
 setupUIFeedback();
+if (import.meta.env.DEV && new URLSearchParams(location.search).get('gfx') === 'low') setGraphicsProfile(false);
 // The native window title is set by Go before the page loads.
 if (lang === 'en') (window as any).runtime?.WindowSetTitle?.(t('AgentSketch · 흐름을 한 장에'));
 (window as any).go?.main?.App?.SetLanguage?.(lang);
@@ -54,6 +72,8 @@ let tabs:ReturnType<typeof mountDocumentTabs>|undefined;
 let workbench:ReturnType<typeof mountWorkbench>|undefined;
 let pathChange:Promise<unknown>=Promise.resolve();
 let booting = true, revision = 0, operationBusy = false;
+let graphicsSettings: GraphicsSettings | undefined;
+let closing = false;
 let lastSavedRecovery = 0;
 let aiChanged = new Set<string>(), aiTimer: ReturnType<typeof setTimeout> | undefined, aiFollow = localStorage.getItem('agentsketch.ai-follow') !== '0';
 type Gesture = {
@@ -144,7 +164,10 @@ function hitNode(p: Point): FlowNode | undefined {
 function hitEdge(p: Point) {
   const view=projectVisibleDocument(doc); const index = new Map(view.nodes.map(n=>[n.id,n])); prepareRoutes(view,index);
   return [...view.edges].reverse().find(e => {
-    const ps = edgePoints(e, view, index); return ps.some((q, i) => i > 0 && distanceToSegment(p, ps[i - 1], q) < 8 / doc.viewport.zoom);
+    const ps = edgePoints(e, view, index);
+    // An 8-unit rounded corner sits up to 2.35 units inside the editable route.
+    const tolerance = Math.max(8 / doc.viewport.zoom, e.style === 'elbow' ? 3 : 0);
+    return ps.some((q, i) => i > 0 && distanceToSegment(p, ps[i - 1], q) < tolerance);
   });
 }
 function nearestPort(n: FlowNode, p: Point): Port {
@@ -183,7 +206,7 @@ function attach(from: string, to: string, fromPort: Port, toPort: Port) {
   if (from === to) { toast('서로 다른 두 요소를 연결하세요.'); return; }
   if (doc.edges.some(e => e.from === from && e.to === to && e.fromPort === fromPort && e.toPort === toPort)) { toast('같은 연결선이 이미 있습니다.'); return; }
   history.push(doc);
-  const edge: FlowEdge = { id: uid(), from, to, fromPort, toPort, label: '', color: PALETTE.line, width: 2, style: 'elbow', dashed: false, arrow: 'end' };
+  const edge: FlowEdge = { id: uid(), from, to, fromPort, toPort, label: '', ...DEFAULT_CONNECTOR, style: 'elbow', dashed: false, arrow: 'end' };
   applyEdgeDefaults(edge);doc.edges.push(edge); selectedEdge = edge.id; selected.clear(); changed('연결선을 추가했습니다. 오른쪽에서 이름을 적을 수 있습니다.');
 }
 
@@ -399,6 +422,7 @@ function updateUI() {
   const title = $<HTMLInputElement>('document-title'); if (document.activeElement !== title) title.value = doc.title;
   $('node-count').textContent = `${doc.nodes.length}개 요소 · ${doc.edges.length}개 연결`;
   const nodes = selectedNodes(), edge = doc.edges.find(e => e.id === selectedEdge), n = nodes[0];
+  updateStylePresets(nodes);
   const names: Record<FlowNode['kind'], string> = { rect: '사각형', round: '둥근 사각형', ellipse: '타원', diamond: '판단', text: '텍스트', note: '메모', image: '이미지', draw: '자유선', frame: '영역 상자' };
   $('selection-summary').textContent = edge ? '연결선' : nodes.length ? nodes.length === 1 ? `${names[n.kind]} · 1개` : `${nodes.length}개 요소 선택` : '작업 안내';
   $('node-inspector').classList.toggle('multi-selection', nodes.length > 1);
@@ -476,11 +500,15 @@ function deleteSelection() {
   mutate(() => { const ids = new Set(editableNodes().map(n => n.id)); removeSelection(doc, ids); if (selectedEdge) doc.edges = doc.edges.filter(e => e.id !== selectedEdge); selected.clear(); selectedEdge = null; }, locked ? '잠긴 요소는 보존했습니다. 잠금을 풀면 삭제할 수 있습니다.' : undefined);
 }
 function groupSelection() { if (editableNodes().length < 2) { toast('두 개 이상의 요소를 선택하세요.'); return; } mutate(() => { createGroup(doc,editableNodes().map(n=>n.id)); }, '요소를 묶었습니다. Ctrl+Shift+G로 풀 수 있습니다.'); }
-async function addImages(files: File[], at = center()) {
+async function addImages(files: File[], at?: Point) {
   if (!files.length) return;
   const targetDocument = doc;
   try {
-    const result = await importImages(files, at);
+    const result = await importImages(files, at ?? center(), {
+      maxWorld: { w: canvas.clientWidth / doc.viewport.zoom, h: canvas.clientHeight / doc.viewport.zoom },
+      pixelRatio: window.devicePixelRatio || 1,
+      centered: !at,
+    });
     if (doc !== targetDocument) { toast('보드가 바뀌어 이미지 추가를 취소했습니다. 현재 보드에 다시 추가하세요.'); return; }
     if (!result.nodes.length) return;
     const candidate = { ...doc, nodes: [...doc.nodes, ...result.nodes], assets: { ...doc.assets, ...result.assets } };
@@ -527,6 +555,20 @@ function replaceDocument(next: FlowDocument, path = '') {
   const bridge=(window as any).go?.main?.App;
   if(bridge?.SetActiveDocumentPath)pathChange=pathChange.then(()=>bridge.SetActiveDocumentPath(path)).catch(error=>toast(String(error),true)); history.clear(); doc = next; selected.clear(); selectedEdge = null; connecting = null; filePath = path; dirty = false; revision++; updateUI(); invalidate(); queueRecovery(); }
 async function openDropped(file: File) { try { if (file.size > 80 * 1024 * 1024) throw new Error('문서가 너무 큽니다. 최대 80 MB까지 열 수 있습니다.'); const next = validateDocument(JSON.parse(await file.text())); if (await guardReplace()) replaceDocument(next); } catch (error) { toast(`보드를 열지 못했습니다. ${String(error)}`, true); } }
+
+function updateGraphicsMenu(settings: GraphicsSettings) {
+  graphicsSettings = settings;
+  const button = $<HTMLButtonElement>('graphics-gpu');
+  const enabled = settings.envOverride ? settings.active : settings.saved;
+  const status = [t(enabled ? '켬' : '끔')];
+  if (settings.envOverride) status.push(t('환경 변수로 GPU 설정이 고정되어 있습니다.'));
+  else if (settings.saved !== settings.active) status.push(t('다시 시작 필요'));
+  $('graphics-gpu-status').textContent = status.join(' · ');
+  button.setAttribute('aria-pressed', String(enabled));
+  button.disabled = settings.envOverride;
+  button.hidden = false;
+}
+
 async function runAction(action: string) {
   switch (action) {
     case 'next-step': if(selected.size===1)mutate(()=>{const id=addNextStep(doc,[...selected][0]);selected=new Set([id]);},'다음 단계를 추가했습니다.');break;
@@ -574,6 +616,17 @@ async function runAction(action: string) {
       toast('보드를 내보내고 있습니다…'); const path = await exportFile(projectVisibleDocument(doc), action.slice(7) as 'png' | 'svg' | 'pdf' | 'html'); if (path) toast('내보내기를 완료했습니다.'); break;
     }
     case 'language': setLang(lang === 'ko' ? 'en' : 'ko'); toast(lang === 'ko' ? 'Restart AgentSketch to switch to English. · 다시 시작하면 영어로 바뀝니다.' : '다시 시작하면 한국어로 바뀝니다. · Restart AgentSketch to switch to Korean.'); break;
+    case 'graphics-gpu': {
+      if (!desktop || !graphicsSettings || graphicsSettings.envOverride || closing) break;
+      const saved = !graphicsSettings.saved;
+      await desktop.SetGPUEnabled(saved);
+      updateGraphicsMenu({ ...graphicsSettings, saved });
+      if (saved !== graphicsSettings.active && await confirmChoice(
+        '그래픽 설정 적용', '새 그래픽 설정을 적용하려면 AgentSketch를 다시 시작하세요.',
+        [{ label: '지금 다시 시작', value: 'restart' }, { label: '나중에', value: 'later' }],
+      ) === 'restart' && !closing) await desktop.RequestRestart();
+      break;
+    }
     case 'template-launch': case 'template-simple': if (await guardReplace()) { replaceDocument(createSample(action === 'template-launch' ? 'launch' : 'simple')); dirty = true; fit(); toast('설명용 예시를 열었습니다. 자유롭게 편집하세요.'); } break;
     case 'help': $<HTMLDialogElement>('help-dialog').showModal(); break;
     case 'focus': $('app').classList.toggle('focus-mode'); break;
@@ -581,7 +634,7 @@ async function runAction(action: string) {
   }
 }
 async function action(name: string) {
-  const long = ['document-card','relink-document','open-linked-document','new', 'open', 'save', 'save-as', 'template-launch', 'template-simple', 'export-png', 'export-svg', 'export-pdf', 'export-html'].includes(name);
+  const long = ['document-card','relink-document','open-linked-document','new', 'open', 'save', 'save-as', 'template-launch', 'template-simple', 'export-png', 'export-svg', 'export-pdf', 'export-html', 'graphics-gpu'].includes(name);
   if (long && operationBusy) return;
   if (long) operationBusy = true;
   try { await runAction(name); } catch (error) { toast(`작업을 완료하지 못했습니다. ${String(error)}`, true); } finally { if (long) operationBusy = false; }
@@ -668,9 +721,32 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && !bo
 
 async function initialize() {
   try { await document.fonts.load('500 13px "Pretendard Variable"', '월간보고 AgentSketch'); } catch { /* System fallback keeps the editor usable. */ }
+  try {
+    const settings = await desktop?.GetGraphicsSettings?.();
+    if (settings) {
+      setGraphicsProfile(settings.active);
+      updateGraphicsMenu(settings);
+    }
+  } catch (error) { toast(t('그래픽 설정을 읽지 못했습니다. {0}', error), true); }
   renderer.resize(wrap.clientWidth, wrap.clientHeight);
-  try { const launch=await (window as any).go?.main?.App?.TakeLaunchDocument?.();const recovered=launch?validateDocument(JSON.parse(launch.data)):await loadAutosave();if(launch){filePath=launch.path;pathChange=(window as any).go.main.App.SetActiveDocumentPath(filePath);} if (recovered) { doc = recovered; dirty = !launch; toast(launch?'문서 파일을 열었습니다.':'이 PC에 저장된 마지막 작업을 복구했습니다.'); } else { doc = createSample('launch'); requestAnimationFrame(() => fit()); } }
-  catch (error) { doc = createSample('launch'); toast(`이전 작업을 복구하지 못했습니다. 저장한 파일을 열 수 있습니다. ${String(error)}`, true); requestAnimationFrame(() => fit()); }
+  invalidate();
+  try {
+    const restartPath = await desktop?.GetRestartDocumentPath?.();
+    const recovered = restartPath == null ? null : await loadAutosave();
+    const launch = recovered ? null
+      : restartPath ? await desktop?.OpenRecentDocument(restartPath) : await desktop?.TakeLaunchDocument?.();
+    const initial = launch ? validateDocument(JSON.parse(launch.data)) : recovered ?? await loadAutosave();
+    if (initial) {
+      doc = initial;
+      dirty = !launch;
+      toast(launch ? '문서 파일을 열었습니다.' : '이 PC에 저장된 마지막 작업을 복구했습니다.');
+      const path = launch?.path ?? restartPath;
+      if (path && desktop) {
+        try { await desktop.SetActiveDocumentPath(path); filePath = path; }
+        catch (error) { toast(String(error), true); }
+      }
+    } else { doc = createSample('launch'); requestAnimationFrame(() => fit()); }
+  } catch (error) { doc = createSample('launch'); toast(`이전 작업을 복구하지 못했습니다. 저장한 파일을 열 수 있습니다. ${String(error)}`, true); requestAnimationFrame(() => fit()); }
   booting = false; tabs=mountDocumentTabs({...workbenchHost,commitEditing:finishEdit,setDirty:value=>{dirty=value;updateUI();},restoreTab:async(next,path,wasDirty)=>{finishEdit();replaceDocument(next,path);dirty=wasDirty;updateUI();return true;}},$('document-tabs'));setTool('select'); updateToggles(); updateUI(); invalidate(); queueRecovery();
   if (isNative) {
     document.querySelector('[data-action="ai-follow"]')?.setAttribute('aria-pressed',String(aiFollow));
@@ -693,16 +769,39 @@ async function initialize() {
       if(command.startsWith('presentation.')){document.querySelector<HTMLButtonElement>(`[data-present="${command.split('.')[1]}"]`)?.click();return {active:document.body.classList.contains('fp-presenting')};}
       throw new CommandError('UNKNOWN_COMMAND',command);
     }});
-    const native = (window as unknown as { go: { main: { App: { Ready(): Promise<void>; CloseWithRecovery(data: string): Promise<void>;CloseWithRecoveryForDocument?(data:string,path:string):Promise<void> } } }; runtime: { EventsOn(name: string, fn: () => void): void } });
-    native.runtime.EventsOn('agentsketch:closing', () => {
-      finishEdit(); clearTimeout(saveTimer);
-      void (tabs?.flush()??Promise.resolve()).catch(error=>toast(`탭 복구 보관: ${String(error)}`,true)).then(()=>pathChange).then(()=>autosave(doc,filePath)).then(() => native.go.main.App.CloseWithRecoveryForDocument?native.go.main.App.CloseWithRecoveryForDocument(JSON.stringify(doc),filePath):native.go.main.App.CloseWithRecovery(JSON.stringify(doc))).catch(error => toast(`작업을 보존하지 못해 종료를 멈췄습니다. 파일로 저장하세요. ${String(error)}`, true));
+    const native = (window as unknown as { go: { main: { App: { Ready(): Promise<void>; CloseWithRecovery(data: string): Promise<void>;CloseWithRecoveryForDocument?(data:string,path:string):Promise<void> } } }; runtime: { EventsOn(name: string, fn: (restart?: boolean) => void): void } });
+    native.runtime.EventsOn('agentsketch:closing', async restart => {
+      if (closing) return;
+      closing = true;
+      try {
+        finishEdit();
+        clearTimeout(saveTimer);
+        await tabs?.flush().catch(error => {
+          if (restart) throw error;
+          toast(`탭 복구 보관: ${String(error)}`, true);
+        });
+        await pathChange;
+        await autosave(doc, filePath);
+        const data = JSON.stringify(doc);
+        const api = native.go.main.App;
+        if (api.CloseWithRecoveryForDocument) await api.CloseWithRecoveryForDocument(data, filePath);
+        else await api.CloseWithRecovery(data);
+      } catch (error) {
+        if (restart) await desktop?.CancelRestart?.();
+        toast(`작업을 보존하지 못해 종료를 멈췄습니다. 파일로 저장하세요. ${String(error)}`, true);
+      } finally { closing = false; }
     });
     native.runtime.EventsOn('agentsketch:open-file',()=>{void (async()=>{try{const result=await (window as any).go.main.App.TakeLaunchDocument();if(result&&await guardReplace()){replaceDocument(validateDocument(JSON.parse(result.data)),result.path);fit();}}catch(error){toast(`파일을 열지 못했습니다. ${String(error)}`,true);}})();});
     await native.go.main.App.Ready();
   }
 }
 const workbenchHost:WorkbenchHost={getDocument:()=>doc,getSelection:()=>selected,getSelectedEdge:()=>selectedEdge,mutate,select,fit,invalidate,toast,replaceDocument:async(next,path)=>{if(!await guardReplace())return false;replaceDocument(next,path);return true;},getFilePath:()=>filePath,getDirty:()=>dirty};
+const updateStylePresets = mountStylePresetsPanel($('shape-presets'), {
+  getDocument: () => doc, getSelection: selectedNodes, mutate,
+  confirmBoardTheme: async family => await confirmChoice(t('{0} 테마를 보드 전체에 적용할까요?', family),
+    t('편집할 수 있는 도형의 색상이 바뀝니다. 실행 취소로 되돌릴 수 있습니다.'),
+    [{label:t('적용'),value:'apply'},{label:t('취소'),value:'cancel'}]) === 'apply',
+});
 workbench=mountWorkbench(workbenchHost);
 void initialize();
 

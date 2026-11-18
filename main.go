@@ -5,7 +5,9 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/wailsapp/go-webview2/pkg/edge"
@@ -18,17 +20,39 @@ import (
 //go:embed all:dist
 var assets embed.FS
 
+const (
+	restartWaitPID     = "AGENTSKETCH_WAIT_PID"
+	restartDocumentArg = "--agentsketch-restart-document="
+)
+
 func main() {
+	restarting, err := waitForRestartParent()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "AgentSketch를 다시 시작할 수 없습니다:", err)
+		return
+	}
+	var recoveryPath *string
+	if restarting && len(os.Args) > 1 {
+		if path, ok := strings.CutPrefix(os.Args[1], restartDocumentArg); ok {
+			recoveryPath = &path
+			os.Args = append(os.Args[:1], os.Args[2:]...)
+		}
+	}
 	// The pinned loader patch passes the mandatory authentication-protection
 	// flag as a real loader option; Wails v2 otherwise clears environment args.
 	edge.SetAdditionalBrowserArguments(strings.Fields(os.Getenv("AGENTSKETCH_BROWSER_ARGUMENTS")))
 	migrateLegacyProfile()
 	app := NewApp()
+	if recoveryPath != nil {
+		// The original arguments can name a document that is no longer active.
+		app.launchPath = ""
+		app.restartRecoveryPath = recoveryPath
+	}
 	profile := ""
 	if dir, err := os.UserConfigDir(); err == nil {
 		profile = filepath.Join(dir, "AgentSketch", "WebView2")
 	}
-	err := wails.Run(&options.App{
+	err = wails.Run(&options.App{
 		Title: "AgentSketch · 흐름을 한 장에",
 		Width: 1440, Height: 940, MinWidth: 960, MinHeight: 640,
 		BackgroundColour:                 &options.RGBA{R: 246, G: 247, B: 249, A: 255},
@@ -41,9 +65,7 @@ func main() {
 			OnSecondInstanceLaunch: app.secondInstance,
 		},
 		Windows: &windows.Options{
-			// Measured Canvas 2D workload used less memory with smoother zoom.
-			// An explicit opt-in remains for other machines or image-heavy work.
-			WebviewGpuIsDisabled: os.Getenv("AGENTSKETCH_ENABLE_GPU") != "1",
+			WebviewGpuIsDisabled: !app.graphics.Active,
 			WebviewUserDataPath:  profile,
 			Theme:                windows.Light,
 			DisablePinchZoom:     true,
@@ -52,8 +74,29 @@ func main() {
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "AgentSketch를 시작할 수 없습니다:", err)
+		return
+	}
+	if path := app.restartDocument.Load(); path != nil {
+		if err := restartApp(*path); err != nil {
+			fmt.Fprintln(os.Stderr, "AgentSketch를 다시 시작할 수 없습니다:", err)
+		}
 	}
 }
+
+func restartApp(path string) error {
+	executable, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	args := append([]string{restartDocumentArg + path}, os.Args[1:]...)
+	cmd := exec.Command(executable, args...)
+	cmd.Env = append(os.Environ(), restartWaitPID+"="+strconv.Itoa(os.Getpid()))
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	return cmd.Process.Release()
+}
+
 
 // Pre-rename builds were called FlowPaper. Move their profile (recovery, library, WebView2 data)
 // once; skip silently if the new folder exists or an old instance holds it open.

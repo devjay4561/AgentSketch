@@ -106,22 +106,36 @@ export function layoutRichContent(node:FlowNode,box:Box,measure:Measure=fallback
   return cachedLayout(node,box,measure);
 }
 
-export function renderRichContent(ctx:CanvasRenderingContext2D,node:FlowNode,box:Box,fontFamily:string):boolean {
+function fitContent(layout:ContentLayout,box:Box,measure:Measure) {
+  let left=0,right=1,bottom=1;
+  for(const rect of layout.rects){left=Math.min(left,rect.x);right=Math.max(right,rect.x+rect.w);bottom=Math.max(bottom,rect.y+rect.h);}
+  for(const item of layout.texts){
+    left=Math.min(left,item.x);
+    right=Math.max(right,item.x+measure(item.text,item.fontSize,item.bold));
+    bottom=Math.max(bottom,item.y+item.fontSize*.725);
+  }
+  const scale=Math.min(1,box.h/bottom,box.w/(right-left));
+  return {x:-left*scale,scale};
+}
+
+export function renderRichContent(ctx:CanvasRenderingContext2D,node:FlowNode,box:Box,fontFamily:string,fit=false):boolean {
   const rich=node as RichNode;if(!rich.textRuns?.length&&rich.contentMode!=='table'&&rich.contentMode!=='checklist')return false;
   const measure:Measure=(text,size,bold)=>{ctx.font=font(size,bold,fontFamily);return ctx.measureText(text).width;};
   ctx.save();const layout=cachedLayout(rich,box,measure);if(!layout){ctx.restore();return false;}
   ctx.beginPath();ctx.rect(box.x,box.y,Math.max(0,box.w),Math.max(0,box.h));ctx.clip();ctx.translate(box.x,box.y);ctx.setLineDash([]);
+  if(fit){const {x,scale}=fitContent(layout,box,measure);ctx.translate(x,0);ctx.scale(scale,scale);}
   for(const rect of layout.rects){ctx.fillStyle=rect.fill;ctx.strokeStyle=rect.stroke;ctx.lineWidth=.8;ctx.fillRect(rect.x,rect.y,rect.w,rect.h);ctx.strokeRect(rect.x,rect.y,rect.w,rect.h);}
   for(const path of layout.paths){ctx.beginPath();ctx.moveTo(path.points[0].x,path.points[0].y);for(const p of path.points.slice(1))ctx.lineTo(p.x,p.y);ctx.strokeStyle=path.stroke;ctx.lineWidth=1.6;ctx.stroke();}
   ctx.textAlign='left';ctx.textBaseline='middle';
   for(const item of layout.texts){ctx.font=font(item.fontSize,item.bold,fontFamily);ctx.fillStyle=item.color;ctx.fillText(item.text,item.x,item.y);if(item.href){ctx.strokeStyle=item.color;ctx.lineWidth=.7;ctx.beginPath();ctx.moveTo(item.x,item.y+item.fontSize*.55);ctx.lineTo(item.x+ctx.measureText(item.text).width,item.y+item.fontSize*.55);ctx.stroke();}}
   ctx.restore();return true;
 }
-export function svgRichContent(node:FlowNode,box:Box,fontFamily:string,measureContext?:CanvasRenderingContext2D|null):string|null {
+export function svgRichContent(node:FlowNode,box:Box,fontFamily:string,measureContext?:CanvasRenderingContext2D|null,fit=false):string|null {
   const rich=node as RichNode;if(!rich.textRuns?.length&&rich.contentMode!=='table'&&rich.contentMode!=='checklist')return null;
   const measure:Measure=measureContext?(text,size,bold)=>{measureContext.font=font(size,bold,fontFamily);return measureContext.measureText(text).width;}:fallbackMeasure;
   const layout=cachedLayout(rich,box,measure);if(!layout)return null;
-  const id=`rich-${node.id}`,parts=[`<defs><clipPath id="${escape(id)}"><rect x="${box.x}" y="${box.y}" width="${Math.max(0,box.w)}" height="${Math.max(0,box.h)}"/></clipPath></defs><g clip-path="url(#${escape(id)})"><g transform="translate(${box.x} ${box.y})">`];
+  const fitTransform=fit?fitContent(layout,box,measure):{x:0,scale:1};
+  const id=`rich-${node.id}`,parts=[`<defs><clipPath id="${escape(id)}"><rect x="${box.x}" y="${box.y}" width="${Math.max(0,box.w)}" height="${Math.max(0,box.h)}"/></clipPath></defs><g clip-path="url(#${escape(id)})"><g transform="translate(${box.x+fitTransform.x} ${box.y}) scale(${fitTransform.scale})">`];
   for(const rect of layout.rects)parts.push(`<rect x="${rect.x}" y="${rect.y}" width="${rect.w}" height="${rect.h}" fill="${rect.fill}" stroke="${rect.stroke}" stroke-width=".8"/>`);
   for(const path of layout.paths)parts.push(`<polyline points="${path.points.map(p=>`${p.x},${p.y}`).join(' ')}" fill="none" stroke="${path.stroke}" stroke-width="1.6"/>`);
   for(const item of layout.texts){const text=`<text x="${item.x}" y="${item.y}" font-family="${escape(fontFamily)}" font-size="${item.fontSize}" font-weight="${item.bold?600:400}" dominant-baseline="central" fill="${escape(item.color)}"${item.href?' text-decoration="underline"':''}>${escape(item.text)}</text>`;parts.push(item.href?`<a href="${escape(item.href)}" target="_blank" rel="noopener noreferrer">${text}</a>`:text);}

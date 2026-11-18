@@ -1,6 +1,7 @@
 import type { Asset, Box, FlowDocument, FlowEdge, FlowNode, Port, ShapeKind } from './types.ts';
 import { bounds } from './geometry.ts';
 import { PALETTE } from './theme.ts';
+import { SHAPE_THEMES } from './shape-themes.ts';
 import {validateNodeExtensions,validateEdgeExtensions,validateWorkspace} from './extension-validation.ts';
 import type {WorkspaceData} from './workspace-types.ts';
 import {t} from './i18n.ts';
@@ -11,13 +12,15 @@ export function uid(): string { return globalThis.crypto.randomUUID(); }
 
 export function createNode(kind: ShapeKind, x: number, y: number): FlowNode {
   const text = kind === 'text' ? t('텍스트를 입력하세요') : kind === 'note' ? t('메모를 입력하세요') : kind === 'frame' ? t('그룹 제목') : kind === 'draw' || kind === 'image' ? '' : t('새 단계');
+  const colors = kind === 'note' ? SHAPE_THEMES[3].soft : SHAPE_THEMES[0].soft;
   return {
     id: uid(), kind, x, y, w: kind === 'frame' ? 560 : kind === 'text' ? 280 : kind === 'diamond' ? 180 : 220,
     h: kind === 'frame' ? 340 : kind === 'text' ? 64 : kind === 'note' ? 160 : kind === 'diamond' ? 140 : 100,
-    text, fill: kind === 'text' || kind === 'draw' ? 'transparent' : kind === 'note' ? PALETTE.note : kind === 'frame' ? PALETTE.frame : '#FFFFFF',
-    stroke: kind === 'text' ? 'transparent' : kind === 'note' ? PALETTE.noteBorder : PALETTE.border, color: PALETTE.ink, fontSize: 16,
+    text, fill: kind === 'text' || kind === 'draw' ? 'transparent' : colors.fill,
+    stroke: kind === 'text' ? 'transparent' : kind === 'draw' ? PALETTE.border : colors.stroke,
+    color: kind === 'text' || kind === 'draw' || kind === 'image' ? PALETTE.ink : colors.color, fontSize: 16,
     bold: false, align: kind === 'note' || kind === 'text' || kind === 'frame' ? 'left' : 'center',
-    strokeWidth: kind === 'text' ? 0 : 1.5, dashed: kind === 'frame', locked: false, opacity: 1,
+    strokeWidth: kind === 'text' ? 0 : kind === 'draw' ? 1.5 : 1, dashed: kind === 'frame', locked: false, opacity: 1,
     ...(kind === 'draw' ? { points: [] } : {}),
   };
 }

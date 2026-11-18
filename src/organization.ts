@@ -54,7 +54,7 @@ export function topGroupId(doc: FlowDocument, groupId: string): string {
 function pageOf(node: FlowNode): string { return node.details?.pageId ?? DEFAULT_PAGE; }
 function onActivePage(doc: FlowDocument, node: FlowNode): boolean { return pageOf(node) === (doc.workspace?.activePageId ?? DEFAULT_PAGE); }
 
-export function editableNodeIds(doc: FlowDocument): Set<string> {
+export function editableNodeIds(doc: FlowDocument, allPages = false): Set<string> {
   const layers = new Map((doc.workspace?.layers ?? []).map(l => [l.id, l]));
   const parents=new Map((doc.workspace?.groups??[]).map(g=>[g.id,g.parentId])),roots=new Map<string,string>();
   const root=(id:string)=>{
@@ -70,7 +70,7 @@ export function editableNodeIds(doc: FlowDocument): Set<string> {
   }
   return new Set(doc.nodes.filter(n => {
     const layer = layers.get(n.details?.layerId ?? DEFAULT_LAYER);
-    return onActivePage(doc, n) && !n.locked && !layer?.locked && !layer?.hidden && !(n.groupId && frozenGroups.has(root(n.groupId)));
+    return (allPages || onActivePage(doc, n)) && !n.locked && !layer?.locked && !layer?.hidden && !(n.groupId && frozenGroups.has(root(n.groupId)));
   }).map(n => n.id));
 }
 

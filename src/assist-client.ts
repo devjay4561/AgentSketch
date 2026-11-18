@@ -1,5 +1,6 @@
 import type {FlowDocument} from './types.ts';
 import {createNode, emptyDocument, uid, validateDocument} from './model.ts';
+import {DEFAULT_CONNECTOR} from './style-defaults.ts';
 
 export type AssistMode = 'review'|'draft';
 /** Only diagram text and relationships are included. Images, paths, owners and notes stay local. */
@@ -59,6 +60,6 @@ export function parseAssistantDraft(response:string):FlowDocument {
     const node=createNode('rect',coordinate(n.x,(i%4)*320),coordinate(n.y,Math.floor(i/4)*180));
     node.text=n.text.slice(0,5000);node.w=Math.max(60,Math.min(1000,coordinate(n.w,220)));node.h=Math.max(40,Math.min(1000,coordinate(n.h,100)));mapping.set(n.id,node.id);doc.nodes.push(node);
   });
-  for(const raw of value.edges){if(!raw||typeof raw!=='object')throw new Error('초안 연결이 올바르지 않습니다.');const from=mapping.get(raw.from),to=mapping.get(raw.to);if(!from||!to)throw new Error('초안 연결이 없는 요소를 가리킵니다.');doc.edges.push({id:uid(),from,to,fromPort:'right',toPort:'left',label:typeof raw.label==='string'?raw.label.slice(0,1000):'',style:'elbow',color:'#67768a',width:2,dashed:false,arrow:'end'});}
+  for(const raw of value.edges){if(!raw||typeof raw!=='object')throw new Error('초안 연결이 올바르지 않습니다.');const from=mapping.get(raw.from),to=mapping.get(raw.to);if(!from||!to)throw new Error('초안 연결이 없는 요소를 가리킵니다.');doc.edges.push({id:uid(),from,to,fromPort:'right',toPort:'left',label:typeof raw.label==='string'?raw.label.slice(0,1000):'',style:'elbow',...DEFAULT_CONNECTOR,dashed:false,arrow:'end'});}
   return validateDocument(doc);
 }
