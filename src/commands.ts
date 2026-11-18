@@ -11,6 +11,7 @@ import {availableRouteSegments,fixRouteSegment,releaseRouteSegment} from './rout
 import {edgePoints,intersects} from './geometry.ts';
 import {addAttachment,removeAttachment,previewSourceRelink,applySourceRelink} from './attachments.ts';
 import {createSample} from './sample.ts';
+import {DEFAULT_CONNECTOR} from './style-defaults.ts';
 
 export class CommandError extends Error {code:string;details:unknown;constructor(code:string,message:string,details?:unknown){super(message);this.code=code;this.details=details;}}
 export type Schema=Record<string,any>;
@@ -84,7 +85,7 @@ def('node.align','그룹을 고려한 정렬.',object({ids,mode:en('left','right
 def('node.distribute','같은 간격으로 배치.',object({ids,direction:en('horizontal','vertical')},['ids','direction']),true,(c,a)=>{editable(c,a.ids);distributeNodes(c.doc,a.ids,a.direction);});
 def('node.next','다음 단계와 연결선 함께 추가.',object({id:S},['id']),true,(c,a)=>{editable(c,[a.id]);return {id:addNextStep(c.doc,a.id)};});
 def('text.format','선택 문자 범위의 굵기·색·크기·링크 설정.',object({id:S,start:N,end:N,style:object({bold:B,color:S,fontSize:N,href:S})},['id','start','end','style']),true,(c,a)=>{editable(c,[a.id]);formatNodeTextRange(findNode(c,a.id),a.start,a.end,a.style);});
-def('edge.add','도형 사이 연결. 모든 선 속성·조건·경유점 지원.',object({id:S,from:S,to:S,props:edgeProperties},['from','to']),true,(c,a)=>{editable(c,[a.from,a.to]);const e:FlowEdge={id:a.id??uid(),from:a.from,to:a.to,fromPort:'right',toPort:'left',label:'',color:'#7B8798',width:2,style:'elbow',dashed:false,arrow:'end'};patch(e,a.props??{});edgeEditable(c,e);c.doc.edges.push(e);return {id:e.id};});
+def('edge.add','도형 사이 연결. 모든 선 속성·조건·경유점 지원.',object({id:S,from:S,to:S,props:edgeProperties},['from','to']),true,(c,a)=>{editable(c,[a.from,a.to]);const e:FlowEdge={id:a.id??uid(),from:a.from,to:a.to,fromPort:'right',toPort:'left',label:'',...DEFAULT_CONNECTOR,style:'elbow',dashed:false,arrow:'end'};patch(e,a.props??{});edgeEditable(c,e);c.doc.edges.push(e);return {id:e.id};});
 def('edge.update','연결 끝점·서식·라벨·조건 수정. null로 선택 속성 해제.',object({id:S,props:edgeProperties},['id','props']),true,(c,a)=>{const e=findEdge(c,a.id);edgeEditable(c,e);patch(e,a.props);edgeEditable(c,e);});
 def('edge.delete','연결 삭제.',object({id:S},['id']),true,(c,a)=>{edgeEditable(c,findEdge(c,a.id));c.doc.edges=c.doc.edges.filter(e=>e.id!==a.id);});
 def('edge.route','계산된 실제 경로·고정 가능한 구간 조회.',object({id:S},['id']),false,(c,a)=>{const e=findEdge(c,a.id);return {points:edgePoints(e,c.doc),segments:availableRouteSegments(c.doc,e)};});

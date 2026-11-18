@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import './style.css';
 import {installAutomation} from './automation-client.ts';
 import {runCommandInPlace,CommandError} from './commands.ts';
@@ -5,7 +6,9 @@ import {mountDocumentTabs} from './document-tabs.ts';
 import type {WorkbenchHost} from './workspace-types.ts';
 import {mountWorkbench} from './workbench.ts';
 import {projectVisibleDocument,editableNodeIds,groupMembers,topGroupId,DEFAULT_PAGE,createGroup,ungroup,reparentDroppedNodes} from './organization.ts';
-import {applyNodeDefaults,applyEdgeDefaults} from './style-defaults.ts';
+import {applyNodeDefaults,applyEdgeDefaults,DEFAULT_CONNECTOR} from './style-defaults.ts';
+import { mountStylePresetsPanel } from './style-presets-panel.ts';
+import { setGraphicsProfile } from './graphics.ts';
 import {addNextStep,splitConnection} from './diagram-actions.ts';
 import {setNodePlainText} from './rich-text.ts';
 import {compareDocuments} from './review-model.ts';
@@ -23,6 +26,7 @@ import { installDomTranslation, lang, setLang, t } from './i18n.ts';
 
 installDomTranslation();
 setupUIFeedback();
+if (import.meta.env.DEV && new URLSearchParams(location.search).get('gfx') === 'low') setGraphicsProfile(false);
 // The native window title is set by Go before the page loads.
 if (lang === 'en') (window as any).runtime?.WindowSetTitle?.(t('AgentSketch · 흐름을 한 장에'));
 (window as any).go?.main?.App?.SetLanguage?.(lang);
@@ -144,7 +148,10 @@ function hitNode(p: Point): FlowNode | undefined {
 function hitEdge(p: Point) {
   const view=projectVisibleDocument(doc); const index = new Map(view.nodes.map(n=>[n.id,n])); prepareRoutes(view,index);
   return [...view.edges].reverse().find(e => {
-    const ps = edgePoints(e, view, index); return ps.some((q, i) => i > 0 && distanceToSegment(p, ps[i - 1], q) < 8 / doc.viewport.zoom);
+    const ps = edgePoints(e, view, index);
+    // An 8-unit rounded corner sits up to 2.35 units inside the editable route.
+    const tolerance = Math.max(8 / doc.viewport.zoom, e.style === 'elbow' ? 3 : 0);
+    return ps.some((q, i) => i > 0 && distanceToSegment(p, ps[i - 1], q) < tolerance);
   });
 }
 function nearestPort(n: FlowNode, p: Point): Port {
@@ -183,7 +190,7 @@ function attach(from: string, to: string, fromPort: Port, toPort: Port) {
   if (from === to) { toast('서로 다른 두 요소를 연결하세요.'); return; }
   if (doc.edges.some(e => e.from === from && e.to === to && e.fromPort === fromPort && e.toPort === toPort)) { toast('같은 연결선이 이미 있습니다.'); return; }
   history.push(doc);
-  const edge: FlowEdge = { id: uid(), from, to, fromPort, toPort, label: '', color: PALETTE.line, width: 2, style: 'elbow', dashed: false, arrow: 'end' };
+  const edge: FlowEdge = { id: uid(), from, to, fromPort, toPort, label: '', ...DEFAULT_CONNECTOR, style: 'elbow', dashed: false, arrow: 'end' };
   applyEdgeDefaults(edge);doc.edges.push(edge); selectedEdge = edge.id; selected.clear(); changed('연결선을 추가했습니다. 오른쪽에서 이름을 적을 수 있습니다.');
 }
 
@@ -399,6 +406,7 @@ function updateUI() {
   const title = $<HTMLInputElement>('document-title'); if (document.activeElement !== title) title.value = doc.title;
   $('node-count').textContent = `${doc.nodes.length}개 요소 · ${doc.edges.length}개 연결`;
   const nodes = selectedNodes(), edge = doc.edges.find(e => e.id === selectedEdge), n = nodes[0];
+  updateStylePresets(nodes);
   const names: Record<FlowNode['kind'], string> = { rect: '사각형', round: '둥근 사각형', ellipse: '타원', diamond: '판단', text: '텍스트', note: '메모', image: '이미지', draw: '자유선', frame: '영역 상자' };
   $('selection-summary').textContent = edge ? '연결선' : nodes.length ? nodes.length === 1 ? `${names[n.kind]} · 1개` : `${nodes.length}개 요소 선택` : '작업 안내';
   $('node-inspector').classList.toggle('multi-selection', nodes.length > 1);
@@ -703,6 +711,12 @@ async function initialize() {
   }
 }
 const workbenchHost:WorkbenchHost={getDocument:()=>doc,getSelection:()=>selected,getSelectedEdge:()=>selectedEdge,mutate,select,fit,invalidate,toast,replaceDocument:async(next,path)=>{if(!await guardReplace())return false;replaceDocument(next,path);return true;},getFilePath:()=>filePath,getDirty:()=>dirty};
+const updateStylePresets = mountStylePresetsPanel($('shape-presets'), {
+  getDocument: () => doc, getSelection: selectedNodes, mutate,
+  confirmBoardTheme: async family => await confirmChoice(t('{0} 테마를 보드 전체에 적용할까요?', family),
+    t('편집할 수 있는 도형의 색상이 바뀝니다. 실행 취소로 되돌릴 수 있습니다.'),
+    [{label:t('적용'),value:'apply'},{label:t('취소'),value:'cancel'}]) === 'apply',
+});
 workbench=mountWorkbench(workbenchHost);
 void initialize();
 

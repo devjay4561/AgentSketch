@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Renderer, renderSVG, lineSegments } from './renderer.ts';
+import { Renderer, edgeArrows, edgeSvgPath, renderSVG, lineSegments } from './renderer.ts';
 import { createNode, emptyDocument, validateDocument } from './model.ts';
 
 test('SVG escapes user text and document titles', () => {
@@ -43,13 +43,14 @@ test('SVG paints frames before connectors and other nodes', () => {
   doc.edges.push({ id: 'edge', from: a.id, to: b.id, fromPort: 'right', toPort: 'left', label: 'EDGE', color: '#333333', width: 2, style: 'straight', dashed: false, arrow: 'end' });
   const svg = renderSVG(doc);
   assert.ok(svg.indexOf('FRAME') < svg.indexOf('EDGE'));
-  assert.ok(svg.indexOf('FRAME') < svg.indexOf('<polyline'));
+  assert.ok(svg.indexOf('FRAME') < svg.indexOf('stroke="#333333"'));
 });
 
 test('SVG uses Pretendard first while preserving colors from saved documents', () => {
   const doc = emptyDocument();
   const a = createNode('rect', 20, 60), b = createNode('rect', 400, 60);
   a.fill = '#355d4d'; a.stroke = '#8ca591'; a.color = '#ffffff';
+  a.strokeWidth = 3.5;
   doc.nodes.push(a, b);
   doc.edges.push({ id: 'edge', from: a.id, to: b.id, fromPort: 'right', toPort: 'left', label: '기존 연결', color: '#73907a', width: 2, style: 'straight', dashed: false, arrow: 'end' });
   const restored = validateDocument(JSON.parse(JSON.stringify(doc)));
@@ -59,7 +60,32 @@ test('SVG uses Pretendard first while preserving colors from saved documents', (
   const svg = renderSVG(restored);
   assert.ok(svg.includes('font-family="&quot;Pretendard Variable&quot;, Pretendard,'));
   assert.ok(svg.includes('fill="#355d4d"'));
+  assert.match(svg, /stroke="#8ca591" stroke-width="3.5"/);
   assert.ok(svg.includes('stroke="#73907a"'));
+});
+
+test('rounded elbows fit short legs and dual arrows keep their original tips', () => {
+  const points = [{x:0,y:0},{x:6,y:0},{x:6,y:4}];
+  assert.match(edgeSvgPath(points,points[0],points[2],true), /L4 0 A2 2 0 0 1 6 2/);
+  const { start,end } = edgeArrows(points.slice(0,2),{arrow:'both',width:3});
+  assert.deepEqual(start?.[0],points[0]);
+  assert.deepEqual(end?.[0],points[1]);
+  assert.ok(start && end && start[2].x < end[2].x);
+});
+
+test('SVG fits every line of oversized plain and rich text within its node', () => {
+  const doc = emptyDocument();
+  const plain = createNode('rect',0,0), rich = createNode('rect',250,0);
+  plain.h = rich.h = 40;
+  plain.text = 'plain one\nplain two\nplain three';
+  rich.text = 'rich one\nrich two\nrich three';
+  rich.textRuns = [{text:rich.text,bold:true}];
+  doc.nodes.push(plain,rich);
+  const svg = renderSVG(doc);
+  assert.ok(svg.includes('plain three') && svg.includes('rich three'));
+  const plainSize = Number(svg.match(/font-size="([^"]+)"/)?.[1]);
+  assert.ok(plainSize * 3 * 1.45 <= 20 + 1e-8);
+  assert.ok(Number(svg.match(/scale\(([^)]+)\)/)?.[1]) < 1);
 });
 
 test('a short text heading keeps its first line inside the canvas clip and matches SVG placement', () => {

@@ -170,9 +170,9 @@ try {
     await page.locator('#board').focus(); await page.keyboard.press('Control+a');
     const order = await page.evaluate(() => ({
       multi: document.querySelector('#node-inspector').classList.contains('multi-selection'),
-      sections: [...document.querySelectorAll('#node-inspector > .inspector-section')].map(el => ({ name: el.querySelector('h2').textContent, top: el.getBoundingClientRect().top, order: getComputedStyle(el).order })).sort((a, b) => a.top - b.top),
+      sections: [...document.querySelectorAll('#node-inspector > .inspector-section')].map(el => ({ name: el.querySelector('h2').textContent, classes: [...el.classList], top: el.getBoundingClientRect().top })).sort((a, b) => a.top - b.top),
     }));
-    check(`${label} multi-selection promotes alignment and grouping`, order.multi && order.sections[0].name === '정렬과 간격' && order.sections[1].name === '구성과 순서', order);
+    check(`${label} multi-selection promotes alignment and grouping`, order.multi && order.sections[0].classes.includes('alignment-section') && order.sections[1].classes.includes('arrange-section'), order);
     await snapshot(page, `${label}-multi-selection`);
 
     await page.locator('[data-tab="layers"]').click();

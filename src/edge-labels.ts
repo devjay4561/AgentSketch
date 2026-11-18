@@ -1,6 +1,7 @@
 import type { Box, FlowDocument, Point } from './types.ts';
 import { bounds, intersects } from './geometry.ts';
 import { route } from './routing.ts';
+import { FONT_FAMILY } from './theme.ts';
 
 export interface EdgeLabel {box:Box;anchor:Point;lines:string[];center:Point;leader:Point[];angle:-90|0|90;textWidth:number;textHeight:number}
 export function pointAlong(points:Point[],position=.5):Point {
@@ -10,7 +11,10 @@ export function pointAlong(points:Point[],position=.5):Point {
   for(let i=0;i<lengths.length;i++){if(remaining<=lengths[i]){const t=lengths[i]?remaining/lengths[i]:0;return{x:points[i].x+(points[i+1].x-points[i].x)*t,y:points[i].y+(points[i+1].y-points[i].y)*t};}remaining-=lengths[i];}
   return points.at(-1)!;
 }
-export const estimateLabelWidth=(text:string)=>[...text].reduce((sum,c)=>sum+(c.charCodeAt(0)>255?12:6.6),0);
+export const EDGE_LABEL_SIZE = 13;
+export const EDGE_LABEL_LINE = 17;
+export const EDGE_LABEL_FONT = `500 ${EDGE_LABEL_SIZE}px ${FONT_FAMILY}`;
+export const estimateLabelWidth=(text:string)=>[...text].reduce((sum,c)=>sum+(c.charCodeAt(0)>255?13:7.15),0);
 const labelCache=new WeakMap<FlowDocument,{signature:string;labels:Map<string,EdgeLabel>}>();
 /** Shared canvas/SVG layout; labels avoid shapes and already placed captions. */
 export function layoutEdgeLabels(doc:FlowDocument,paths:Map<string,Point[]>,measure=estimateLabelWidth):Map<string,EdgeLabel>{
@@ -25,7 +29,7 @@ export function layoutEdgeLabels(doc:FlowDocument,paths:Map<string,Point[]>,meas
     for(const paragraph of edge.label.replace(/\r/g,'').split('\n')){
       let line='';for(const c of paragraph){if(line&&measure(line+c)>300){lines.push(line);line='';}line+=c;}lines.push(line);
     }
-    const textWidth=Math.max(24,...lines.map(measure))+12,textHeight=lines.length*16+8,angle=edge.labelAngle??0;
+    const textWidth=Math.max(20,...lines.map(measure))+16,textHeight=lines.length*EDGE_LABEL_LINE+8,angle=edge.labelAngle??0;
     const w=angle?textHeight:textWidth,h=angle?textWidth:textHeight;
     let center={...anchor},box:Box={x:center.x-w/2,y:center.y-h/2,w,h};
     const free=(candidate:Box)=>!obstacles.some(b=>intersects(b,candidate))&&!occupied.some(b=>intersects(b,candidate))&&!doc.edges.some(other=>{

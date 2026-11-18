@@ -2,7 +2,8 @@ import type { Asset, Box, FlowDocument, FlowEdge, FlowNode, Point, RenderState }
 import { bounds, edgePoints, portPoint, prepareRoutes, routeHandles } from './geometry.ts';
 import { FONT_FAMILY, PALETTE } from './theme.ts';
 import { renderRichContent, svgRichContent, WRAP_TOKENS } from './rich-render.ts';
-import { layoutEdgeLabels, type EdgeLabel } from './edge-labels.ts';
+import { EDGE_LABEL_FONT, EDGE_LABEL_LINE, EDGE_LABEL_SIZE, layoutEdgeLabels, type EdgeLabel } from './edge-labels.ts';
+import { graphicsProfile } from './graphics.ts';
 import { t } from './i18n.ts';
 
 const FONT = FONT_FAMILY;
@@ -87,38 +88,75 @@ export function textBox(node: FlowNode): Box {
   return { x: node.x + 14, y: node.y + 10, w: node.w - 28, h: node.h - 20 };
 }
 
-function pathNode(ctx: CanvasRenderingContext2D, node: FlowNode): void {
+function exportTextBox(node: FlowNode): Box {
+  const box = textBox(node);
+  return box.w > 0 && box.h > 0 ? box : {x:node.x,y:node.y,w:node.w,h:node.h};
+}
+
+function plainTextScale(lines: string[], box: Box, fontSize: number, measure: (text: string) => number): number {
+  const longest = lines.reduce((width,line) => Math.max(width,measure(line)),1);
+  return Math.min(1, box.w/longest, box.h/(lines.length*fontSize*1.45));
+}
+
+export function shapeRadius(node: Pick<FlowNode, 'kind' | 'w' | 'h'>): number {
+  const radius = node.kind === 'round' ? 14 : node.kind === 'frame' ? 12 : node.kind === 'image' || node.kind === 'note' ? 8 : 6;
+  return Math.min(radius, node.w / 2, node.h / 2);
+}
+
+function diamondVertices(x: number, y: number, w: number, h: number): Point[] {
+  return [{x:x+w/2,y}, {x:x+w,y:y+h/2}, {x:x+w/2,y:y+h}, {x,y:y+h/2}];
+}
+
+function diamondCut(w: number, h: number): number {
+  return Math.min(8, Math.min(w, h) / 4);
+}
+
+function pathNode(ctx: CanvasRenderingContext2D, node: FlowNode, simplified = false): void {
   const { x, y, w, h, kind } = node;
   ctx.beginPath();
   if (kind === 'ellipse') ctx.ellipse(x + w / 2, y + h / 2, Math.max(.5, w / 2), Math.max(.5, h / 2), 0, 0, Math.PI * 2);
   else if (kind === 'diamond') {
-    ctx.moveTo(x + w / 2, y); ctx.lineTo(x + w, y + h / 2);
-    ctx.lineTo(x + w / 2, y + h); ctx.lineTo(x, y + h / 2); ctx.closePath();
+    if (simplified) {
+      ctx.moveTo(x+w/2,y);ctx.lineTo(x+w,y+h/2);ctx.lineTo(x+w/2,y+h);ctx.lineTo(x,y+h/2);ctx.closePath();
+      return;
+    }
+    const points = diamondVertices(x, y, w, h), cut = diamondCut(w, h);
+    ctx.moveTo(x + w / 4, y + h / 4);
+    for (const [i, p] of points.entries()) {
+      const next = points[(i + 1) % 4];
+      ctx.arcTo(p.x, p.y, next.x, next.y, cut * (i % 2 ? h / w : w / h));
+    }
+    ctx.closePath();
   } else if (kind === 'draw') {
     const points = node.points ?? [];
     if (points.length) {
       ctx.moveTo(x + points[0].x, y + points[0].y);
       for (const p of points.slice(1)) ctx.lineTo(x + p.x, y + p.y);
     }
-  } else if (kind === 'round' || kind === 'frame' || kind === 'image') {
-    ctx.roundRect(x, y, w, h, Math.min(kind === 'round' ? 15 : 8, w / 2, h / 2));
-  } else ctx.rect(x, y, w, h);
+  } else if (kind === 'text' || simplified) ctx.rect(x, y, w, h);
+  else ctx.roundRect(x, y, w, h, shapeRadius(node));
 }
 
-function drawText(ctx: CanvasRenderingContext2D, node: FlowNode): void {
-  const box = textBox(node);
-  if (renderRichContent(ctx,node,box,FONT)) return;
+function drawText(ctx: CanvasRenderingContext2D, node: FlowNode, fit: boolean): void {
+  const box = fit ? exportTextBox(node) : textBox(node);
+  if (renderRichContent(ctx,node,box,FONT,fit)) return;
   if (!node.text) return;
-  if (box.w < 4 || box.h < 4) return;
-  const fontSize = node.kind === 'frame' ? Math.min(18, node.fontSize) : node.fontSize;
+  if (!fit && (box.w < 4 || box.h < 4)) return;
+  let fontSize = node.kind === 'frame' ? Math.min(18, node.fontSize) : node.fontSize;
+  const weight = node.bold ? 600 : 500;
   ctx.save();
   ctx.beginPath(); ctx.rect(box.x, box.y, box.w, box.h); ctx.clip();
-  ctx.font = `${node.bold ? 600 : 400} ${fontSize}px ${FONT}`;
+  ctx.font = `${weight} ${fontSize}px ${FONT}`;
   ctx.fillStyle = node.color;
   ctx.textBaseline = 'middle';
   const align = node.kind === 'frame' ? 'left' : node.align;
   ctx.textAlign = align;
-  const lines = lineSegments(node.text, box.w, text => ctx.measureText(text).width);
+  const measure = (text: string) => ctx.measureText(text).width;
+  const lines = lineSegments(node.text, box.w, measure);
+  if (fit) {
+    fontSize *= plainTextScale(lines,box,fontSize,measure);
+    ctx.font = `${weight} ${fontSize}px ${FONT}`;
+  }
   const lh = fontSize * 1.45;
   const top = node.kind === 'note' || node.kind === 'text' || node.kind === 'frame';
   const start = box.y + (top ? lh / 2 : Math.max(lh / 2, (box.h - lines.length * lh) / 2 + lh / 2));
@@ -127,21 +165,52 @@ function drawText(ctx: CanvasRenderingContext2D, node: FlowNode): void {
   ctx.restore();
 }
 
-function drawNode(ctx: CanvasRenderingContext2D, node: FlowNode, bitmap?: Bitmap, imageFailed = false, textVisible = true): void {
+function hasDepth(node: FlowNode): boolean {
+  return node.kind !== 'text' && node.kind !== 'draw' && (node.opacity ?? 1) === 1 &&
+    node.fill !== 'transparent' && (node.fill.length !== 9 || node.fill.slice(7).toLowerCase() === 'ff');
+}
+
+type ShapeEffects = 'flat' | 'low' | 'rich';
+
+function drawNode(ctx: CanvasRenderingContext2D, node: FlowNode, bitmap?: Bitmap, imageFailed = false, textVisible = true, effects: ShapeEffects = 'flat', pixelScale = 1, fitText = false, simplified = false): void {
   ctx.save();
   ctx.globalAlpha = node.opacity ?? 1;
   ctx.lineWidth = node.strokeWidth;
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   ctx.strokeStyle = node.stroke; ctx.fillStyle = node.fill;
   ctx.setLineDash(node.dashed ? [8, 5] : []);
-  pathNode(ctx, node);
+  pathNode(ctx, node, simplified);
   if (node.kind === 'draw') ctx.stroke();
   else {
-    if (node.fill !== 'transparent') ctx.fill();
+    if (node.fill !== 'transparent') {
+      const depth = effects !== 'flat' && hasDepth(node);
+      if (depth && effects === 'rich') {
+        ctx.shadowColor = 'rgba(16,24,40,.06)'; ctx.shadowOffsetY = pixelScale; ctx.shadowBlur = 2 * pixelScale;
+        ctx.fill();
+        ctx.shadowColor = 'rgba(16,24,40,.09)'; ctx.shadowOffsetY = 4 * pixelScale; ctx.shadowBlur = 12 * pixelScale;
+        ctx.fill();
+        ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+        ctx.save(); ctx.clip();
+        const highlight = ctx.createLinearGradient(0, node.y, 0, node.y + node.h);
+        highlight.addColorStop(0, 'rgba(255,255,255,.07)');
+        highlight.addColorStop(.08, 'rgba(255,255,255,.025)');
+        highlight.addColorStop(1, 'rgba(16,24,40,.025)');
+        ctx.fillStyle = highlight; ctx.fillRect(node.x, node.y, node.w, node.h);
+        ctx.fillStyle = 'rgba(255,255,255,.20)'; ctx.fillRect(node.x, node.y, node.w, 1);
+        ctx.restore();
+      } else {
+        if (depth) {
+          ctx.save(); ctx.translate(0, 2); pathNode(ctx, node); ctx.fillStyle = 'rgba(16,24,40,.09)'; ctx.fill(); ctx.restore();
+          pathNode(ctx, node);
+        }
+        ctx.fill();
+      }
+    }
     if (node.strokeWidth > 0 && node.stroke !== 'transparent') ctx.stroke();
   }
   if (node.kind === 'note') {
-    ctx.fillStyle = 'rgba(0,0,0,.045)'; ctx.fillRect(node.x, node.y, node.w, 7);
+    ctx.save(); ctx.clip(); ctx.fillStyle = node.stroke;
+    ctx.fillRect(node.x, node.y, node.w, 3); ctx.restore();
   }
   if (node.kind === 'frame') {
     ctx.beginPath(); ctx.moveTo(node.x, node.y + 43); ctx.lineTo(node.x + node.w, node.y + 43);
@@ -167,7 +236,7 @@ function drawNode(ctx: CanvasRenderingContext2D, node: FlowNode, bitmap?: Bitmap
     }
     ctx.restore();
   }
-  if (node.kind !== 'draw' && textVisible) drawText(ctx, node);
+  if (node.kind !== 'draw' && textVisible) drawText(ctx, node, fitText);
   if (node.locked) {
     const x = node.x + node.w - 13, y = node.y + 12;
     ctx.strokeStyle = PALETTE.muted; ctx.fillStyle = PAPER; ctx.lineWidth = 1.3; ctx.setLineDash([]);
@@ -177,45 +246,102 @@ function drawNode(ctx: CanvasRenderingContext2D, node: FlowNode, bitmap?: Bitmap
   ctx.restore();
 }
 
-function arrow(ctx: CanvasRenderingContext2D, tip: Point, from: Point, size: number): void {
-  const angle = Math.atan2(tip.y - from.y, tip.x - from.x);
-  ctx.beginPath(); ctx.moveTo(tip.x, tip.y);
-  ctx.lineTo(tip.x - size * Math.cos(angle - Math.PI / 6), tip.y - size * Math.sin(angle - Math.PI / 6));
-  ctx.lineTo(tip.x - size * Math.cos(angle + Math.PI / 6), tip.y - size * Math.sin(angle + Math.PI / 6));
+type Arrow = [tip: Point, wing: Point, notch: Point, otherWing: Point];
+
+function arrow(tip: Point, from: Point, size: number, fraction: number): Arrow | undefined {
+  const dx = tip.x - from.x, dy = tip.y - from.y, length = Math.hypot(dx, dy);
+  if (!length) return;
+  const ratio = Math.min(size / length, fraction), x = dx * ratio, y = dy * ratio;
+  return [tip,
+    {x:tip.x-x+y*.34, y:tip.y-y-x*.34},
+    {x:tip.x-x*.74, y:tip.y-y*.74},
+    {x:tip.x-x-y*.34, y:tip.y-y+x*.34}];
+}
+
+function drawArrow(ctx: CanvasRenderingContext2D, points: Arrow | undefined): void {
+  if (!points) return;
+  ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
   ctx.closePath(); ctx.fill();
+}
+
+export function edgeArrows(points: Point[], edge: Pick<FlowEdge, 'arrow' | 'width'>) {
+  if (points.length < 2) return {};
+  const size = 8 + edge.width * 2, fraction = points.length === 2 && edge.arrow === 'both' ? .48 : .85;
+  const start = edge.arrow === 'both' ? arrow(points[0], points[1], size, fraction) : undefined;
+  const end = edge.arrow !== 'none' ? arrow(points[points.length - 1], points[points.length - 2], size, fraction) : undefined;
+  return { start, end };
+}
+
+export function visualEdgePoints(points: Point[], edge: FlowEdge, nodes: ReadonlyMap<string, FlowNode>): Point[] {
+  if (points.length < 2) return points;
+  const first = nodes.get(edge.from), last = nodes.get(edge.to);
+  const startDiamond = first?.kind === 'diamond' && !edge.fromAnchor;
+  const endDiamond = last?.kind === 'diamond' && !edge.toAnchor;
+  if (!startDiamond && !endDiamond) return points;
+  const adjust = (p: Point, node: FlowNode, port: FlowEdge['fromPort']): Point => {
+    const {w,h}=node, cut=diamondCut(w,h), diagonal=Math.hypot(w,h);
+    const x=cut*w/(diagonal+h), y=cut*h/(diagonal+w);
+    return {x:p.x+(port==='left'?x:port==='right'?-x:0),y:p.y+(port==='top'?y:port==='bottom'?-y:0)};
+  };
+  return [
+    startDiamond ? adjust(points[0],first,edge.fromPort) : points[0],
+    ...points.slice(1,-1),
+    endDiamond ? adjust(points[points.length-1],last,edge.toPort) : points[points.length-1],
+  ];
+}
+
+function elbowRadius(a: Point, b: Point, c: Point): number {
+  if (a.x === b.x && b.y === c.y) return Math.min(8, Math.abs(b.y-a.y)/2, Math.abs(c.x-b.x)/2);
+  if (a.y === b.y && b.x === c.x) return Math.min(8, Math.abs(b.x-a.x)/2, Math.abs(c.y-b.y)/2);
+  return 0;
+}
+
+function traceEdge(ctx: CanvasRenderingContext2D, points: Point[], first: Point, last: Point, round: boolean): void {
+  ctx.beginPath(); ctx.moveTo(first.x, first.y);
+  for (let i = 1; i < points.length - 1; i++) {
+    const p = points[i], next = i === points.length - 2 ? last : points[i+1];
+    const radius = round ? elbowRadius(i === 1 ? first : points[i-1], p, next) : 0;
+    if (radius) ctx.arcTo(p.x, p.y, next.x, next.y, radius);
+    else ctx.lineTo(p.x, p.y);
+  }
+  ctx.lineTo(last.x, last.y);
 }
 
 function drawEdge(ctx: CanvasRenderingContext2D, edge: FlowEdge, points: Point[], selected = false, zoom = 1, label?: EdgeLabel, background: string = PAPER): void {
   if (points.length < 2) return;
-  ctx.save(); ctx.lineJoin = edge.style === 'elbow' ? 'miter' : 'round'; ctx.lineCap = edge.style === 'elbow' ? 'butt' : 'round'; ctx.miterLimit = 2;
-  ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
-  for (const p of points.slice(1)) ctx.lineTo(p.x, p.y);
+  const { start, end } = selected || (8 + edge.width * 2) * zoom >= 1 ? edgeArrows(points, edge) : {};
+  const elbow = edge.style === 'elbow';
+  ctx.save(); ctx.lineJoin = elbow ? 'miter' : 'round'; ctx.lineCap = elbow || start || end ? 'butt' : 'round';
+  ctx.miterLimit = 2;
+  traceEdge(ctx, points, start?.[2] ?? points[0], end?.[2] ?? points[points.length - 1], elbow && zoom >= .125);
   // A narrow paper casing makes a crossing visibly different from a junction.
   ctx.lineWidth=edge.width+4/zoom;ctx.strokeStyle=background;ctx.stroke();
   if (selected) { ctx.lineWidth = edge.width + 7 / zoom; ctx.strokeStyle = PALETTE.accentSoft; ctx.stroke(); }
   ctx.strokeStyle = edge.color; ctx.fillStyle = edge.color; ctx.lineWidth = edge.width;
   ctx.setLineDash(edge.dashed ? [7, 5] : []); ctx.stroke(); ctx.setLineDash([]);
-  const size = Math.max(9, edge.width * 4);
-  if (edge.arrow === 'end' || edge.arrow === 'both') arrow(ctx, points[points.length - 1], points[points.length - 2], size);
-  if (edge.arrow === 'both') arrow(ctx, points[0], points[1], size);
+  drawArrow(ctx, end); drawArrow(ctx, start);
   if (label) {
     const {center,lines,leader,angle,textWidth,textHeight}=label;
     if(leader.length){ctx.strokeStyle=edge.color;ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(leader[0].x,leader[0].y);for(const p of leader.slice(1))ctx.lineTo(p.x,p.y);ctx.stroke();}
     ctx.save();ctx.translate(center.x,center.y);ctx.rotate(angle*Math.PI/180);
-    ctx.fillStyle=edge.labelBackground??'#fff';ctx.beginPath();ctx.roundRect(-textWidth/2,-textHeight/2,textWidth,textHeight,4);ctx.fill();
-    ctx.fillStyle=edge.color;ctx.font=`12px ${FONT}`;ctx.textAlign='center';ctx.textBaseline='middle';
-    lines.forEach((line,i)=>ctx.fillText(line,0,-textHeight/2+12+i*16));ctx.restore();
+    ctx.fillStyle=edge.labelBackground??'#fff';ctx.beginPath();ctx.roundRect(-textWidth/2,-textHeight/2,textWidth,textHeight,textHeight/2);ctx.fill();
+    ctx.globalAlpha=.25;ctx.strokeStyle=edge.color;ctx.lineWidth=1;ctx.stroke();ctx.globalAlpha=1;
+    ctx.fillStyle=edge.color;ctx.font=EDGE_LABEL_FONT;ctx.textAlign='center';ctx.textBaseline='middle';
+    lines.forEach((line,i)=>ctx.fillText(line,0,(i-(lines.length-1)/2)*EDGE_LABEL_LINE));ctx.restore();
   }
   ctx.restore();
 }
 
-function selection(ctx: CanvasRenderingContext2D, node: FlowNode, zoom: number): void {
+function selection(ctx: CanvasRenderingContext2D, node: FlowNode, zoom: number, rich: boolean, pixelScale: number): void {
   const box = inflate(node, 3 / zoom), size = 7 / zoom;
   ctx.save(); ctx.strokeStyle = ACCENT; ctx.fillStyle = '#fff'; ctx.lineWidth = 1.5 / zoom; ctx.setLineDash([]);
-  ctx.strokeRect(box.x, box.y, box.w, box.h);
+  ctx.beginPath(); ctx.roundRect(box.x, box.y, box.w, box.h, Math.min(shapeRadius(node) + 3/zoom, box.w/2, box.h/2));
+  if (rich) { ctx.shadowColor = 'rgba(247,107,21,.28)'; ctx.shadowBlur = 5 * pixelScale; }
+  ctx.stroke(); ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
   if (!node.locked) {
     for (const x of [node.x, node.x + node.w]) for (const y of [node.y, node.y + node.h]) {
-      ctx.fillRect(x - size / 2, y - size / 2, size, size); ctx.strokeRect(x - size / 2, y - size / 2, size, size);
+      ctx.beginPath(); ctx.roundRect(x - size / 2, y - size / 2, size, size, 2/zoom); ctx.fill(); ctx.stroke();
     }
     for (const port of ['top', 'right', 'bottom', 'left'] as const) {
       const p = portPoint(node, port);
@@ -316,6 +442,8 @@ export class Renderer {
     ctx.translate(x, y); ctx.scale(zoom, zoom);
     const visible = { x: -x / zoom - 80, y: -y / zoom - 80, w: this.width / zoom + 160, h: this.height / zoom + 160 };
     const visibleNodes = doc.nodes.filter(node => intersects(node, visible));
+    const rich = graphicsProfile().richEffects && visibleNodes.length <= 64, pixelScale = zoom * this.ratio, simplified = zoom < .1;
+    const effects = (node: FlowNode): ShapeEffects => visibleNodes.length > 400 || Math.min(node.w, node.h) * zoom < 24 ? 'flat' : rich ? 'rich' : 'low';
     const imageNodes = visibleNodes.filter(node => node.kind === 'image' && node.assetId && doc.assets[node.assetId]);
     imageNodes.sort((a, b) => Math.hypot(a.x + a.w / 2 - (visible.x + visible.w / 2), a.y + a.h / 2 - (visible.y + visible.h / 2)) - Math.hypot(b.x + b.w / 2 - (visible.x + visible.w / 2), b.y + b.h / 2 - (visible.y + visible.h / 2)));
     const activeImages = new Set(imageNodes.map(node => node.assetId!).slice(0, IMAGE_COUNT));
@@ -323,17 +451,22 @@ export class Renderer {
     // bitmap per photograph. Retain at most the closest 64 visible assets.
     for (const [id] of this.images) if (!activeImages.has(id)) this.evict(id);
     const imageBudget = IMAGE_PIXELS / Math.max(1, activeImages.size);
-    for (const node of visibleNodes) if (node.kind === 'frame') drawNode(ctx, node, undefined, false, node.fontSize * zoom >= 5);
+    for (const node of visibleNodes) if (node.kind === 'frame') drawNode(ctx, node, undefined, false, node.fontSize * zoom >= 5, effects(node), pixelScale, false, simplified);
     const paths=new Map(doc.edges.map(e=>[e.id,edgePoints(e,doc,nodeIndex)]));
-    ctx.font=`12px ${FONT}`;const labels=layoutEdgeLabels(doc,paths,t=>ctx.measureText(t).width);
+    ctx.font=EDGE_LABEL_FONT;const labels=layoutEdgeLabels(doc,paths,t=>ctx.measureText(t).width);
     this.blockedEdges = [];
     for (const edge of doc.edges) {
       const points = paths.get(edge.id)!;
       if (!points.length) this.blockedEdges.push(edge.id);
       if (points.length) {
-        const xs = points.map(p => p.x), ys = points.map(p => p.y);
-        const box = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
-        if (intersects(inflate(box, 60), visible)) drawEdge(ctx, edge, points, state.edgeSelection === edge.id, zoom, labels.get(edge.id));
+        let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+        for (const p of points) {
+          left = Math.min(left, p.x); right = Math.max(right, p.x);
+          top = Math.min(top, p.y); bottom = Math.max(bottom, p.y);
+        }
+        const label = labels.get(edge.id);
+        if ((left - 60 <= visible.x + visible.w && right + 60 >= visible.x && top - 60 <= visible.y + visible.h && bottom + 60 >= visible.y) ||
+          (label && intersects(label.box, visible))) drawEdge(ctx, edge, simplified ? points : visualEdgePoints(points,edge,nodeIndex), state.edgeSelection === edge.id, zoom, label);
       }
     }
     for (const node of visibleNodes) {
@@ -345,17 +478,17 @@ export class Renderer {
         const maximum = Math.max(32, Math.floor(Math.min(2048, Math.sqrt(imageBudget * aspect), Math.max(node.w, node.h) * zoom * this.ratio / Math.max(.05,Math.min(node.crop?.w??1,node.crop?.h??1)))));
         cached = this.requestImage(asset, maximum, imageBudget);
       }
-      drawNode(ctx, node, cached?.bitmap, cached?.failed, node.fontSize * zoom >= 5);
+      drawNode(ctx, node, cached?.bitmap, cached?.failed, node.fontSize * zoom >= 5, effects(node), pixelScale, false, simplified);
     }
     const activeEdge=doc.edges.find(e=>e.id===state.edgeSelection);
     if(activeEdge?.style==='elbow'){
       const points=edgePoints(activeEdge,doc,nodeIndex);
       const handles=routeHandles(activeEdge,points).map(h=>h.point);
       ctx.fillStyle='#fff';ctx.strokeStyle=ACCENT;ctx.lineWidth=1.5/zoom;
-      for(const p of handles){ctx.fillRect(p.x-4/zoom,p.y-4/zoom,8/zoom,8/zoom);ctx.strokeRect(p.x-4/zoom,p.y-4/zoom,8/zoom,8/zoom);}
+      for(const p of handles){ctx.beginPath();ctx.roundRect(p.x-4/zoom,p.y-4/zoom,8/zoom,8/zoom,2/zoom);ctx.fill();ctx.stroke();}
       for(const p of [points[0],points.at(-1)])if(p){ctx.beginPath();ctx.arc(p.x,p.y,5/zoom,0,Math.PI*2);ctx.fill();ctx.stroke();}
     }
-    for (const node of doc.nodes) if (state.selection.has(node.id)) selection(ctx, node, zoom);
+    for (const node of visibleNodes) if (state.selection.has(node.id)) selection(ctx, node, zoom, effects(node) === 'rich', this.ratio);
     if (state.remote?.size) {
       // Recent edits from an external agent: outline plus a name tag, like a co-editor in a shared document.
       ctx.save(); ctx.strokeStyle = REMOTE; ctx.lineWidth = 2.5 / zoom; ctx.setLineDash([]);
@@ -376,7 +509,7 @@ export class Renderer {
       const { from, to } = state.connection;
       ctx.strokeStyle = ACCENT; ctx.fillStyle = ACCENT; ctx.lineWidth = 2 / zoom; ctx.setLineDash([6 / zoom, 4 / zoom]);
       ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(to.x, to.y); ctx.stroke(); ctx.setLineDash([]);
-      arrow(ctx, to, from, 10 / zoom);
+      drawArrow(ctx, arrow(to, from, 10 / zoom, .85));
     }
     if (state.guides) {
       ctx.strokeStyle = PALETTE.accentText; ctx.lineWidth = 1 / zoom; ctx.setLineDash([4 / zoom, 4 / zoom]);
@@ -408,7 +541,7 @@ function documentBounds(doc: FlowDocument): Box {
     all.w = right - all.x; all.h = bottom - all.y;
   }
   const measure=typeof document!=='undefined'?document.createElement('canvas').getContext('2d'):null;
-  if(measure)measure.font=`12px ${FONT}`;
+  if(measure)measure.font=EDGE_LABEL_FONT;
   const labels=layoutEdgeLabels(doc,new Map(doc.edges.map(e=>[e.id,edgePoints(e,doc,nodeIndex)])),measure?t=>measure.measureText(t).width:undefined);
   for(const {box} of labels.values()){const right=Math.max(all.x+all.w,box.x+box.w),bottom=Math.max(all.y+all.h,box.y+box.h);all.x=Math.min(all.x,box.x);all.y=Math.min(all.y,box.y);all.w=right-all.x;all.h=bottom-all.y;}
   return inflate(all, PAD);
@@ -424,18 +557,18 @@ export async function renderPNG(doc: FlowDocument, scale = 2): Promise<string> {
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.scale(safeScale, safeScale); ctx.translate(-box.x, -box.y);
   const nodeIndex = new Map(doc.nodes.map(node => [node.id, node])); prepareRoutes(doc, nodeIndex);
-  for (const node of doc.nodes) if (node.kind === 'frame') drawNode(ctx, { ...node, locked: false });
-  ctx.font=`12px ${FONT}`;
+  for (const node of doc.nodes) if (node.kind === 'frame') drawNode(ctx, { ...node, locked: false }, undefined, false, true, 'rich', safeScale, true);
+  ctx.font=EDGE_LABEL_FONT;
   const paths=new Map(doc.edges.map(e=>[e.id,edgePoints(e,doc,nodeIndex)]));
   const labels=layoutEdgeLabels(doc,paths,t=>ctx.measureText(t).width);
-  for (const edge of doc.edges) drawEdge(ctx, edge, paths.get(edge.id)!, false, 1, labels.get(edge.id), '#fff');
+  for (const edge of doc.edges) drawEdge(ctx, edge, visualEdgePoints(paths.get(edge.id)!,edge,nodeIndex), false, 1, labels.get(edge.id), '#fff');
   for (const node of doc.nodes) {
     if (node.kind === 'frame') continue;
     let bitmap: Bitmap | undefined;
     if (node.kind === 'image' && node.assetId && doc.assets[node.assetId]) {
       bitmap = await decodeImage(doc.assets[node.assetId], Math.min(8192, Math.max(node.w, node.h) * safeScale / Math.max(.01,Math.min(node.crop?.w??1,node.crop?.h??1))));
     }
-    drawNode(ctx, { ...node, locked: false }, bitmap);
+    drawNode(ctx, { ...node, locked: false }, bitmap, false, true, 'rich', safeScale, true);
     closeImage(bitmap);
   }
   const data = canvas.toDataURL('image/png');
@@ -450,25 +583,56 @@ function escape(value: string): string {
 function svgColor(value: string): string { return escape(value === 'transparent' ? 'none' : value); }
 function n(value: number): string { return String(Math.round(value * 100) / 100); }
 
-function svgArrow(tip: Point, from: Point, size: number, color: string): string {
-  const a = Math.atan2(tip.y - from.y, tip.x - from.x);
-  const p1 = { x: tip.x - size * Math.cos(a - Math.PI / 6), y: tip.y - size * Math.sin(a - Math.PI / 6) };
-  const p2 = { x: tip.x - size * Math.cos(a + Math.PI / 6), y: tip.y - size * Math.sin(a + Math.PI / 6) };
-  return `<path d="M${n(tip.x)},${n(tip.y)} L${n(p1.x)},${n(p1.y)} L${n(p2.x)},${n(p2.y)} Z" fill="${svgColor(color)}"/>`;
+function svgPoint(p: Point): string { return `${n(p.x)} ${n(p.y)}`; }
+
+function svgCorner(a: Point, b: Point, c: Point, radius: number, cut = radius): string {
+  const dx=b.x-a.x, dy=b.y-a.y, ex=c.x-b.x, ey=c.y-b.y;
+  const back=cut/Math.hypot(dx,dy), ahead=cut/Math.hypot(ex,ey);
+  const entry={x:b.x-dx*back,y:b.y-dy*back}, exit={x:b.x+ex*ahead,y:b.y+ey*ahead};
+  return `L${svgPoint(entry)} A${n(radius)} ${n(radius)} 0 0 ${dx*ey-dy*ex > 0 ? 1 : 0} ${svgPoint(exit)}`;
+}
+
+export function diamondPath(x: number, y: number, w: number, h: number): string {
+  const points=diamondVertices(x,y,w,h), cut=diamondCut(w,h);
+  const corners=points.map((p,i)=>svgCorner(points[(i+3)%4],p,points[(i+1)%4],cut*(i%2?h/w:w/h),cut));
+  return `M${n(x+w/4)} ${n(y+h/4)} ${corners.join(' ')} Z`;
+}
+
+export function roundRectPath(x: number, y: number, w: number, h: number, r: number): string {
+  r = Math.min(r, w/2, h/2);
+  return `M${x+r} ${y} H${x+w-r} A${r} ${r} 0 0 1 ${x+w} ${y+r} V${y+h-r} A${r} ${r} 0 0 1 ${x+w-r} ${y+h} H${x+r} A${r} ${r} 0 0 1 ${x} ${y+h-r} V${y+r} A${r} ${r} 0 0 1 ${x+r} ${y} Z`;
+}
+
+export function edgeSvgPath(points: Point[], first: Point, last: Point, round: boolean): string {
+  const interior = points.slice(1,-1).map((p,i)=>{
+    const a=i===0?first:points[i], c=i===points.length-3?last:points[i+2];
+    const radius=round?elbowRadius(a,p,c):0;
+    return radius?svgCorner(a,p,c,radius):`L${svgPoint(p)}`;
+  });
+  return `M${svgPoint(first)} ${interior.join(' ')} L${svgPoint(last)}`;
+}
+
+function svgShape(node: FlowNode, attrs: string): string {
+  const {x,y,w,h,kind}=node;
+  if (kind === 'ellipse') return `<ellipse cx="${n(x+w/2)}" cy="${n(y+h/2)}" rx="${n(w/2)}" ry="${n(h/2)}" ${attrs}/>`;
+  if (kind === 'diamond') return `<path d="${diamondPath(x,y,w,h)}" ${attrs}/>`;
+  if (kind === 'draw') return `<polyline points="${(node.points ?? []).map(p=>`${n(x+p.x)},${n(y+p.y)}`).join(' ')}" ${attrs}/>`;
+  return `<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="${kind === 'text' ? 0 : n(shapeRadius(node))}" ${attrs}/>`;
 }
 
 function svgText(node: FlowNode, measure?: CanvasRenderingContext2D | null): string {
-  const box = textBox(node), fs = node.kind === 'frame' ? Math.min(18, node.fontSize) : node.fontSize;
-  const rich=svgRichContent(node,box,FONT,measure);if(rich!==null)return rich;
+  const box = exportTextBox(node), baseSize = node.kind === 'frame' ? Math.min(18, node.fontSize) : node.fontSize;
+  const rich=svgRichContent(node,box,FONT,measure,true);if(rich!==null)return rich;
   if (!node.text) return '';
-  if (measure) measure.font = `${node.bold ? 600 : 400} ${fs}px ${FONT}`;
-  const lines = lineSegments(node.text, Math.max(1, box.w), text => measure?.measureText(text).width ?? [...text].reduce((sum, char) => sum + fs * (char.charCodeAt(0) > 255 ? 1 : .55), 0));
+  if (measure) measure.font = `${node.bold ? 600 : 500} ${baseSize}px ${FONT}`;
+  const textWidth = (text: string) => measure?.measureText(text).width ?? [...text].reduce((sum,char) => sum+baseSize*(char.charCodeAt(0)>255?1:.55),0);
+  const lines = lineSegments(node.text, box.w, textWidth);
+  const fs = baseSize * plainTextScale(lines,box,baseSize,textWidth);
   const lh = fs * 1.45, align = node.kind === 'frame' ? 'left' : node.align;
   const top = node.kind === 'note' || node.kind === 'text' || node.kind === 'frame';
   const start = box.y + (top ? lh / 2 : Math.max(lh / 2, (box.h - lines.length * lh) / 2 + lh / 2));
   const tx = box.x + (align === 'center' ? box.w / 2 : align === 'right' ? box.w : 0);
-  const visible = lines.filter((_, i) => start + i * lh - fs / 2 <= box.y + box.h);
-  return `<text font-family="${escape(FONT)}" font-size="${n(fs)}" font-weight="${node.bold ? 600 : 400}" text-anchor="${align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start'}" dominant-baseline="central" fill="${svgColor(node.color)}">${visible.map((line, i) => `<tspan x="${n(tx)}" y="${n(start + i * lh)}">${escape(line)}</tspan>`).join('')}</text>`;
+  return `<text font-family="${escape(FONT)}" font-size="${fs}" font-weight="${node.bold ? 600 : 500}" text-anchor="${align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start'}" dominant-baseline="central" fill="${svgColor(node.color)}">${lines.map((line, i) => `<tspan x="${n(tx)}" y="${n(start + i * lh)}">${escape(line)}</tspan>`).join('')}</text>`;
 }
 
 export function renderSVG(doc: FlowDocument): string {
@@ -476,34 +640,40 @@ export function renderSVG(doc: FlowDocument): string {
   const frameParts: string[] = [];
   const nodeIndex = new Map(doc.nodes.map(node => [node.id, node])); prepareRoutes(doc, nodeIndex);
   const measure = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
-  if(measure)measure.font=`12px ${FONT}`;
+  if(measure)measure.font=EDGE_LABEL_FONT;
   const paths=new Map(doc.edges.map(e=>[e.id,edgePoints(e,doc,nodeIndex)]));
   const labels=layoutEdgeLabels(doc,paths,measure?t=>measure.measureText(t).width:undefined);
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${n(box.x)} ${n(box.y)} ${n(box.w)} ${n(box.h)}" width="${n(box.w)}" height="${n(box.h)}" role="img"><title>${escape(doc.title)}</title><rect x="${n(box.x)}" y="${n(box.y)}" width="${n(box.w)}" height="${n(box.h)}" fill="white"/>`);
+  const defs = `<defs><filter id="shape-depth" x="-30%" y="-30%" width="160%" height="165%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#101828" flood-opacity=".12"/></filter><linearGradient id="shape-light" x2="0" y2="1"><stop stop-color="white" stop-opacity=".07"/><stop offset=".08" stop-color="white" stop-opacity=".025"/><stop offset="1" stop-color="#101828" stop-opacity=".025"/></linearGradient></defs>`;
   for (const edge of doc.edges) {
-    const points = edgePoints(edge, doc, nodeIndex);
+    const points = visualEdgePoints(paths.get(edge.id)!,edge,nodeIndex);
     if (points.length < 2) continue;
-    parts.push(`<polyline points="${points.map(p=>`${n(p.x)},${n(p.y)}`).join(' ')}" fill="none" stroke="white" stroke-width="${n(edge.width+4)}" stroke-linejoin="miter"/>`);
-    parts.push(`<polyline points="${points.map(p => `${n(p.x)},${n(p.y)}`).join(' ')}" fill="none" stroke="${svgColor(edge.color)}" stroke-width="${n(edge.width)}" stroke-linejoin="${edge.style === 'elbow' ? 'miter' : 'round'}" stroke-linecap="${edge.style === 'elbow' ? 'butt' : 'round'}" stroke-miterlimit="2"${edge.dashed ? ' stroke-dasharray="7 5"' : ''}/>`);
-    const size = Math.max(9, edge.width * 4);
-    if (edge.arrow === 'end' || edge.arrow === 'both') parts.push(svgArrow(points[points.length - 1], points[points.length - 2], size, edge.color));
-    if (edge.arrow === 'both') parts.push(svgArrow(points[0], points[1], size, edge.color));
+    const {start,end}=edgeArrows(points,edge);
+    const path=edgeSvgPath(points,start?.[2]??points[0],end?.[2]??points[points.length-1],edge.style==='elbow');
+    const line=`d="${path}" fill="none" stroke-linejoin="round" stroke-linecap="${start||end?'butt':'round'}"`;
+    parts.push(`<path ${line} stroke="white" stroke-width="${n(edge.width+4)}"/>`);
+    parts.push(`<path ${line} stroke="${svgColor(edge.color)}" stroke-width="${n(edge.width)}"${edge.dashed ? ' stroke-dasharray="7 5"' : ''}/>`);
+    for(const arrow of [end,start])if(arrow)parts.push(`<polygon points="${arrow.map(svgPoint).join(' ')}" fill="${svgColor(edge.color)}"/>`);
     const label=labels.get(edge.id);
     if(label){const {center,lines,leader,angle,textWidth,textHeight}=label;
       if(leader.length)parts.push(`<polyline points="${leader.map(p=>`${n(p.x)},${n(p.y)}`).join(' ')}" fill="none" stroke="${svgColor(edge.color)}" stroke-width=".8"/>`);
-      parts.push(`<g transform="translate(${n(center.x)} ${n(center.y)}) rotate(${angle})"><rect x="${n(-textWidth/2)}" y="${n(-textHeight/2)}" width="${n(textWidth)}" height="${n(textHeight)}" rx="4" fill="${svgColor(edge.labelBackground??'#ffffff')}"/><text text-anchor="middle" dominant-baseline="central" font-family="${escape(FONT)}" font-size="12" fill="${svgColor(edge.color)}">${lines.map((line,i)=>`<tspan x="0" y="${n(-textHeight/2+12+i*16)}">${escape(line)}</tspan>`).join('')}</text></g>`);
+      parts.push(`<g transform="translate(${n(center.x)} ${n(center.y)}) rotate(${angle})"><rect x="${n(-textWidth/2)}" y="${n(-textHeight/2)}" width="${n(textWidth)}" height="${n(textHeight)}" rx="${n(textHeight/2)}" fill="${svgColor(edge.labelBackground??'#ffffff')}" stroke="${svgColor(edge.color)}" stroke-opacity=".25"/><text text-anchor="middle" dominant-baseline="central" font-family="${escape(FONT)}" font-size="${EDGE_LABEL_SIZE}" font-weight="500" fill="${svgColor(edge.color)}">${lines.map((line,i)=>`<tspan x="0" y="${n((i-(lines.length-1)/2)*EDGE_LABEL_LINE)}">${escape(line)}</tspan>`).join('')}</text></g>`);
     }
   }
   for (const node of doc.nodes) {
     const start = parts.length;
     const { x, y, w, h } = node;
-    const attrs = `fill="${node.kind === 'draw' ? 'none' : svgColor(node.fill)}" stroke="${svgColor(node.stroke)}" stroke-width="${n(node.strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"${node.dashed ? ' stroke-dasharray="8 5"' : ''}`;
+    const fill = node.kind === 'draw' ? 'none' : svgColor(node.fill);
+    const stroke = `stroke="${svgColor(node.stroke)}" stroke-width="${n(node.strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"${node.dashed ? ' stroke-dasharray="8 5"' : ''}`;
     parts.push(`<g opacity="${n(node.opacity ?? 1)}">`);
-    if (node.kind === 'ellipse') parts.push(`<ellipse cx="${n(x + w / 2)}" cy="${n(y + h / 2)}" rx="${n(w / 2)}" ry="${n(h / 2)}" ${attrs}/>`);
-    else if (node.kind === 'diamond') parts.push(`<polygon points="${n(x + w / 2)},${n(y)} ${n(x + w)},${n(y + h / 2)} ${n(x + w / 2)},${n(y + h)} ${n(x)},${n(y + h / 2)}" ${attrs}/>`);
-    else if (node.kind === 'draw') parts.push(`<polyline points="${(node.points ?? []).map(p => `${n(x + p.x)},${n(y + p.y)}`).join(' ')}" ${attrs}/>`);
-    else parts.push(`<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="${n(h)}" rx="${node.kind === 'round' ? 15 : node.kind === 'frame' || node.kind === 'image' ? 8 : 0}" ${attrs}/>`);
-    if (node.kind === 'note') parts.push(`<rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="7" fill="black" opacity=".045"/>`);
+    if (hasDepth(node)) {
+      parts.push(svgShape(node,`fill="${fill}" filter="url(#shape-depth)"`));
+      parts.push(svgShape(node,`fill="url(#shape-light)" ${stroke}`));
+    } else parts.push(svgShape(node,`fill="${fill}" ${stroke}`));
+    if (node.kind === 'note') {
+      const clipId=escape(`note-${node.id}`);
+      parts.push(`<clipPath id="${clipId}">${svgShape(node,'')}</clipPath><rect x="${n(x)}" y="${n(y)}" width="${n(w)}" height="3" fill="${svgColor(node.stroke)}" clip-path="url(#${clipId})"/>`);
+    }
     if (node.kind === 'frame') parts.push(`<path d="M${n(x)} ${n(y + 43)}H${n(x + w)}" stroke="${svgColor(node.stroke)}" stroke-width=".8"/>`);
     if (node.kind === 'image' && node.assetId) {
       const asset = doc.assets[node.assetId];
@@ -518,7 +688,7 @@ export function renderSVG(doc: FlowDocument): string {
     if (node.kind === 'frame') frameParts.push(...parts.splice(start));
   }
   parts.push('</svg>');
-  return parts[0] + frameParts.join('') + parts.slice(1).join('');
+  return parts[0] + defs + frameParts.join('') + parts.slice(1).join('');
 }
 
 export function drawMinimap(canvas: HTMLCanvasElement, doc: FlowDocument, viewportWidth: number, viewportHeight: number): void {
@@ -537,17 +707,17 @@ export function drawMinimap(canvas: HTMLCanvasElement, doc: FlowDocument, viewpo
   ctx.translate(ox, oy); ctx.scale(scale, scale);
   for (const node of doc.nodes) if (node.kind === 'frame') {
     ctx.fillStyle = node.fill === 'transparent' ? '#FFFFFF' : node.fill; ctx.strokeStyle = node.stroke;
-    ctx.lineWidth = .65 / scale; pathNode(ctx, node); ctx.fill(); ctx.stroke();
+    ctx.lineWidth = .65 / scale; pathNode(ctx, node, scale < .1); ctx.fill(); ctx.stroke();
   }
   for (const edge of doc.edges) {
     const points = edgePoints(edge, doc, nodeIndex); if (!points.length) continue;
     ctx.strokeStyle = edge.color; ctx.lineWidth = 1 / scale;
-    ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y); for (const p of points.slice(1)) ctx.lineTo(p.x, p.y); ctx.stroke();
+    traceEdge(ctx, points, points[0], points[points.length-1], false); ctx.stroke();
   }
   for (const node of doc.nodes) {
-    if (node.kind === 'frame') continue;
+    if (node.kind === 'frame' || node.kind === 'text') continue;
     ctx.fillStyle = node.fill === 'transparent' ? '#B5C1D1' : node.fill; ctx.strokeStyle = node.stroke === 'transparent' ? '#98A6B9' : node.stroke;
-    ctx.lineWidth = .65 / scale; pathNode(ctx, node);
+    ctx.lineWidth = .65 / scale; pathNode(ctx, node, scale < .1);
     if (node.kind !== 'draw') ctx.fill(); ctx.stroke();
   }
   const v = doc.viewport;
