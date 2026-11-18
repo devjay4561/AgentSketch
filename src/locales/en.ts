@@ -1180,6 +1180,7 @@ export const EN: Record<string, string> = {
   "이미지": "Image",
   "이미지 data와 name 필요": "Image data and name required",
   "이미지 교체": "Replace image",
+  "원본 크기로": "Original size",
   "이미지 글자 읽기": "Read text from image",
   "이미지 내보내기를 시작할 수 없습니다.": "Can't start image export.",
   "이미지 내용 회전": "Rotate image content",
