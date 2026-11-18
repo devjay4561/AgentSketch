@@ -2,7 +2,15 @@
 
 이 프로젝트의 주요 변경 사항을 기록합니다. 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/)를, 버전은 [Semantic Versioning](https://semver.org/lang/ko/)을 따릅니다.
 
-## [Unreleased]
+## [Unreleased] (0.2.0)
+
+### Added
+
+- 파일 메뉴의 고품질 그래픽 (GPU) 설정과 작업을 복구용으로 보관한 뒤 다시 시작하는 기능을 추가했습니다.
+
+### Changed
+
+- GPU 가속을 기본으로 켭니다. `AGENTSKETCH_ENABLE_GPU=0` 또는 `1`이 저장한 설정보다 우선합니다.
 
 ## [0.1.1] - 2026-11-02
 

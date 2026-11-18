@@ -171,7 +171,7 @@ ai/cli.mjs ── CLI · MCP stdio ── same document engine (src/commands.ts)
 
 - **No continuous render loop** — redraw only on change; skip off-screen elements.
 - **Memory budget** — image strings are shared across undo history and the decode cache is bounded. Up to 64 images nearest the center are drawn on screen; saving and exporting always include every image.
-- **GPU off by default** — on the measured Canvas 2D workload this improved both memory and zoom responsiveness. Set `AGENTSKETCH_ENABLE_GPU=1` to turn it on.
+- **GPU on by default**. Toggle it under **File → High-quality graphics (GPU)**. The setting takes effect the next time the app starts. Choose **Restart now** to keep the latest work for auto-recovery before restarting. Set `AGENTSKETCH_ENABLE_GPU=0` or `1` to override the saved preference.
 - **Heavy features on demand** — PDF/PPTX modules, OCR and sharing load only when used.
 - **Document contract** — the `.agentsketch` format is defined by [`src/types.ts`](src/types.ts) and `validateDocument`.
 

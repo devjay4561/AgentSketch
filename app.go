@@ -21,15 +21,20 @@ type OpenResult struct {
 }
 
 type App struct {
-	ctx         context.Context
-	store       *Store
-	documents   *DocumentLibrary
-	currentPath atomic.Value
-	ready       atomic.Bool
-	allowClose  atomic.Bool
-	launchMu    sync.Mutex
-	launchPath  string
-	english     atomic.Bool
+	ctx                 context.Context
+	store               *Store
+	documents           *DocumentLibrary
+	currentPath         atomic.Value
+	ready               atomic.Bool
+	allowClose          atomic.Bool
+	restartRequested    atomic.Bool
+	restartDocument     atomic.Pointer[string]
+	restartRecoveryPath *string
+	settingsPath        string
+	graphics            GraphicsSettings
+	launchMu            sync.Mutex
+	launchPath          string
+	english             atomic.Bool
 }
 
 // SetLanguage is called by the frontend with its UI language ("ko" or "en") for native dialogs.
@@ -52,8 +57,44 @@ func NewApp() *App {
 		library = filepath.Join(filepath.Dir(recovery), "library")
 	}
 	workingDirectory, _ := os.Getwd()
-	return &App{store: NewStore(recovery), documents: NewDocumentLibrary(library), launchPath: launchDocumentPath(os.Args[1:], workingDirectory)}
+	settingsPath := userSettingsPath()
+	return &App{
+		store: NewStore(recovery), documents: NewDocumentLibrary(library),
+		launchPath:   launchDocumentPath(os.Args[1:], workingDirectory),
+		settingsPath: settingsPath,
+		graphics:     resolveGraphicsSettings(loadGPUSetting(settingsPath), os.Getenv("AGENTSKETCH_ENABLE_GPU")),
+	}
 }
+
+func (a *App) GetGraphicsSettings() GraphicsSettings {
+	settings := a.graphics
+	settings.Saved = loadGPUSetting(a.settingsPath)
+	return settings
+}
+
+func (a *App) SetGPUEnabled(enabled bool) error {
+	if a.graphics.EnvOverride {
+		return errors.New(a.tr("환경 변수로 GPU 설정이 고정되어 있습니다.", "The GPU setting is controlled by an environment variable."))
+	}
+	if err := saveGPUSetting(a.settingsPath, enabled); err != nil {
+		return fmt.Errorf(a.tr("그래픽 설정을 저장하지 못했습니다. %w", "Couldn't save graphics settings. %w"), err)
+	}
+	return nil
+}
+
+func (a *App) GetRestartDocumentPath() *string { return a.restartRecoveryPath }
+
+func (a *App) RequestRestart() error {
+	if !a.ready.Load() || a.allowClose.Load() {
+		return errors.New(a.tr("지금은 AgentSketch를 다시 시작할 수 없습니다.", "AgentSketch can't restart right now."))
+	}
+	if a.restartRequested.CompareAndSwap(false, true) {
+		runtime.Quit(a.ctx)
+	}
+	return nil
+}
+
+func (a *App) CancelRestart() { a.restartRequested.Store(false) }
 
 func (a *App) startup(ctx context.Context) { a.ctx = ctx }
 
@@ -80,7 +121,7 @@ func (a *App) beforeClose(ctx context.Context) bool {
 	if a.allowClose.Load() || !a.ready.Load() {
 		return false
 	}
-	runtime.EventsEmit(ctx, "agentsketch:closing")
+	runtime.EventsEmit(ctx, "agentsketch:closing", a.restartRequested.Load())
 	return true
 }
 
@@ -101,17 +142,21 @@ func (a *App) Ready() {
 // CloseWithRecovery saves the very latest state, including a pending text edit,
 // before allowing the native close. Any error leaves the window open.
 func (a *App) CloseWithRecovery(data string) error {
-	if err := a.Autosave(data); err != nil {
-		return fmt.Errorf("자동 복구 저장에 실패했습니다. 문서를 파일로 저장한 뒤 다시 닫아 주세요: %w", err)
-	}
-	a.allowClose.Store(true)
-	runtime.Quit(a.ctx)
-	return nil
+	path, _ := a.currentPath.Load().(string)
+	return a.finishClose(a.Autosave(data), path)
 }
 
 func (a *App) CloseWithRecoveryForDocument(data string, path string) error {
-	if err := a.AutosaveForDocument(data, path); err != nil {
+	return a.finishClose(a.AutosaveForDocument(data, path), path)
+}
+
+func (a *App) finishClose(err error, path string) error {
+	if err != nil {
+		a.CancelRestart()
 		return fmt.Errorf("자동 복구 저장에 실패했습니다. 문서를 파일로 저장한 뒤 다시 닫아 주세요: %w", err)
+	}
+	if a.restartRequested.Swap(false) {
+		a.restartDocument.Store(&path)
 	}
 	a.allowClose.Store(true)
 	runtime.Quit(a.ctx)
