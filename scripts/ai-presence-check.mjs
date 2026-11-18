@@ -30,6 +30,12 @@ try{
  await page.waitForTimeout(150);assert.ok(await blue()>20,'AI highlight drawn');assert.match(await indicator.textContent(),/AI 편집 중/);
  await page.screenshot({path:path.join(root,'highlight.png')});checks.push('highlight-and-working');
  await page.waitForTimeout(2800);assert.equal(await blue(),0,'highlight clears');assert.match(await indicator.textContent(),/외부 제어 중/);checks.push('highlight-clears');
+ // The user moving the view is not an edit, and a following AI change does not pull the view away.
+ await page.mouse.move(500,450);await page.keyboard.down('Shift');await page.mouse.wheel(0,160);await page.keyboard.up('Shift');await page.waitForTimeout(900);
+ assert.doesNotMatch(await page.locator('#save-status').textContent(),/저장 중/,'panning does not autosave');
+ const panned=await send({command:'document.read'}),pv=panned.results[0].result.viewport;
+ await send({commands:[{command:'node.add',args:{id:'ai-far3',kind:'round',x:-7000,y:7000,props:{text:'사용자 시야 유지'}}}],expectedRevision:panned.revision});
+ assert.deepEqual((await send({command:'document.read'})).results[0].result.viewport,pv,'AI edit keeps the view the user just moved to');checks.push('user-view-kept');
  await follow.click();assert.equal(await follow.getAttribute('aria-pressed'),'false');
  const r=await send({command:'document.read'});const view=r.results[0].result.viewport;
  await send({commands:[{command:'node.add',args:{id:'ai-far2',kind:'round',x:-9000,y:-9000,props:{text:'따라가지 않음'}}}],expectedRevision:r.revision});

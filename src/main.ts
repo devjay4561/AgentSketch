@@ -120,6 +120,11 @@ function changed(message?: string) {
   revision++; dirty = true; updateUI(); invalidate(); queueRecovery();
   if (message) toast(message);
 }
+// Moving or zooming the view is not an edit: it is not autosaved on its own, not undone,
+// and an AI edit does not pull the view away while the user is looking around.
+// The current view is still written with the next edit and when the app closes.
+let lastNavigation = -Infinity;
+function viewMoved() { lastNavigation = performance.now(); invalidate(); }
 function queueRecovery() {
   clearTimeout(saveTimer);
   if (booting) return;
@@ -138,10 +143,11 @@ function aiCommit(next: FlowDocument) {
   // Compare with the normalized current document; raw sample/legacy nodes lack fields validation fills in.
   const touched = new Set(compareDocuments(validateDocument(cloneDocument(doc)), next).changes.filter(c => c.change !== 'removed').map(c => c.id));
   const nodes = next.nodes.filter(n => touched.has(n.id)), edges = next.edges.filter(e => touched.has(e.id));
+  next.viewport = { ...doc.viewport };
   mutate(() => {
     doc = next; for (const id of [...selected]) if (!doc.nodes.some(n => n.id === id)) selected.delete(id); if (selectedEdge && !doc.edges.some(e => e.id === selectedEdge)) selectedEdge = null;
     const ends = new Set(edges.flatMap(e => [e.from, e.to])), focus = projectVisibleDocument(doc).nodes.filter(n => nodes.some(c => c.id === n.id) || ends.has(n.id));
-    if (aiFollow && focus.length) {
+    if (aiFollow && focus.length && performance.now() - lastNavigation > 4000) {
       // Pan inside the commit so the revision returned to the agent already includes the new viewport.
       const b = bounds(focus), v = doc.viewport, view = { x: -v.x / v.zoom, y: -v.y / v.zoom, w: canvas.clientWidth / v.zoom, h: canvas.clientHeight / v.zoom };
       if (b.x < view.x || b.y < view.y || b.x + b.w > view.x + view.w || b.y + b.h > view.y + view.h) { v.x = canvas.clientWidth / 2 - (b.x + b.w / 2) * v.zoom; v.y = canvas.clientHeight / 2 - (b.y + b.h / 2) * v.zoom; }
@@ -227,13 +233,13 @@ function setTool(tool: Tool) {
 }
 function zoomAt(amount: number, screen = { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 }) {
   const v = doc.viewport, z = Math.max(.1, Math.min(4, amount)), x = (screen.x - v.x) / v.zoom, y = (screen.y - v.y) / v.zoom;
-  v.zoom = z; v.x = screen.x - x * z; v.y = screen.y - y * z; invalidate(); queueRecovery();
+  v.zoom = z; v.x = screen.x - x * z; v.y = screen.y - y * z; viewMoved();
 }
 function fit(nodes = projectVisibleDocument(doc).nodes) {
   if (!nodes.length) { doc.viewport = { x: 80, y: 80, zoom: 1 }; invalidate(); return; }
   const b = bounds(nodes), width = canvas.clientWidth, height = canvas.clientHeight;
   const z = Math.max(.1, Math.min(1.2, (width - 110) / Math.max(b.w, 1), (height - 110) / Math.max(b.h, 1)));
-  doc.viewport = { x: width / 2 - (b.x + b.w / 2) * z, y: height / 2 - (b.y + b.h / 2) * z, zoom: z }; invalidate(); queueRecovery();
+  doc.viewport = { x: width / 2 - (b.x + b.w / 2) * z, y: height / 2 - (b.y + b.h / 2) * z, zoom: z }; invalidate(); // Fit runs on open too; it does not hold back AI follow.
 }
 function attach(from: string, to: string, fromPort: Port, toPort: Port) {
   if (from === to) { toast('서로 다른 두 요소를 연결하세요.'); return; }
@@ -323,7 +329,7 @@ canvas.addEventListener('pointermove', e => {
     const previous=edge.waypoints; edge.waypoints=points;
     if(!edgePoints(edge,doc).length)edge.waypoints=previous;
   }
-  if (g.kind === 'pan') { doc.viewport.x = g.start.x + s.x - g.screen.x; doc.viewport.y = g.start.y + s.y - g.screen.y; }
+  if (g.kind === 'pan') { doc.viewport.x = g.start.x + s.x - g.screen.x; doc.viewport.y = g.start.y + s.y - g.screen.y; lastNavigation = performance.now(); }
   if (g.kind === 'move' && g.moved && g.positions?.length) {
     let dx = p.x - g.start.x, dy = p.y - g.start.y; guides = [];
     if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
@@ -382,7 +388,7 @@ function endGesture(e: PointerEvent, canceled = false) {
   } else if (g.kind === 'marquee') {
     const ids = new Set(g.initialSelection),editable=editableNodeIds(doc); if (g.moved && marquee) projectVisibleDocument(doc).nodes.filter(n => editable.has(n.id) && n.kind !== 'frame' && intersects(n, marquee!)).forEach(n => expandGroup(n).forEach(id => ids.add(id)));
     selected = ids; marquee = undefined; updateUI();
-  } else if (g.kind === 'pan') { queueRecovery(); }
+  } else if (g.kind === 'pan') { viewMoved(); }
   else if (g.moved || g.kind === 'create' || g.kind === 'draw') {
     if (g.kind === 'draw') {
       const n = doc.nodes.find(n => n.id === g.nodeId)!;
@@ -412,7 +418,7 @@ canvas.addEventListener('pointerleave', () => setHover(null));
 canvas.addEventListener('pointercancel', e => endGesture(e, true));
 canvas.addEventListener('wheel', e => {
   e.preventDefault(); finishEdit();
-  if (e.shiftKey) { doc.viewport.x -= e.deltaY; doc.viewport.y -= e.deltaX; invalidate(); queueRecovery(); }
+  if (e.shiftKey) { doc.viewport.x -= e.deltaY; doc.viewport.y -= e.deltaX; viewMoved(); }
   else zoomAt(doc.viewport.zoom * Math.exp(-Math.max(-120, Math.min(120, e.deltaY)) * .0018), screenPoint(e));
 }, { passive: false });
 canvas.addEventListener('dblclick', e => {
@@ -637,8 +643,8 @@ async function runAction(action: string) {
     case 'open': if (await guardReplace()) { const result = await openDocument(); if (result) replaceDocument(result.doc, result.path); } break;
     case 'save': await save(false); break;
     case 'save-as': await save(true); break;
-    case 'undo': { finishEdit(); const previous = history.undo(doc); if (previous) { doc = previous; selected.clear(); selectedEdge = null; connecting = null; changed(); } break; }
-    case 'redo': { finishEdit(); const next = history.redo(doc); if (next) { doc = next; selected.clear(); selectedEdge = null; connecting = null; changed(); } break; }
+    case 'undo': { finishEdit(); const previous = history.undo(doc); if (previous) { previous.viewport = { ...doc.viewport }; doc = previous; selected.clear(); selectedEdge = null; connecting = null; changed(); } break; }
+    case 'redo': { finishEdit(); const next = history.redo(doc); if (next) { next.viewport = { ...doc.viewport }; doc = next; selected.clear(); selectedEdge = null; connecting = null; changed(); } break; }
     case 'image': pickImages(); break;
     case 'fit': fit(); break;
     case 'fit-selection': fit(selectedNodes().length ? selectedNodes() : doc.nodes); break;
@@ -766,7 +772,7 @@ minimap?.addEventListener('pointerdown', e => {
   const scale = Math.min((r.width - 14) / Math.max(b.w, 1), (r.height - 14) / Math.max(b.h, 1));
   const offsetX = (r.width - b.w * scale) / 2, offsetY = (r.height - b.h * scale) / 2;
   const x = b.x + (e.clientX - r.left - offsetX) / scale, y = b.y + (e.clientY - r.top - offsetY) / scale;
-  doc.viewport.x = canvas.clientWidth / 2 - x * doc.viewport.zoom; doc.viewport.y = canvas.clientHeight / 2 - y * doc.viewport.zoom; invalidate(); queueRecovery();
+  doc.viewport.x = canvas.clientWidth / 2 - x * doc.viewport.zoom; doc.viewport.y = canvas.clientHeight / 2 - y * doc.viewport.zoom; viewMoved();
 });
 const observer = new ResizeObserver(() => { renderer.resize(wrap.clientWidth, wrap.clientHeight); invalidate(); }); observer.observe(wrap);
 window.addEventListener('beforeunload', e => { if (!isNative && dirty && lastSavedRecovery !== revision) { e.preventDefault(); e.returnValue = ''; } });
