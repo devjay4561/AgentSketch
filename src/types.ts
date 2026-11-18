@@ -20,6 +20,8 @@ export interface FlowNode extends Box {
   textRuns?: TextRun[];
   contentMode?: 'text'|'checklist'|'table';
   table?: NodeTable;
+  /** 'card': first line is a title, the rest are quieter detail lines. Plain text only. */
+  textStyle?: 'card';
 }
 export interface FlowEdge {
   id: string; from: string; to: string; fromPort: Port; toPort: Port;

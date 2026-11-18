@@ -9,9 +9,18 @@ export function mountStylePresetsPanel(panel: HTMLElement, host: {
   getSelection: () => FlowNode[];
   mutate: (action: () => void) => void;
   confirmBoardTheme: (family: string) => Promise<boolean>;
+  tidyBoard: () => void;
 }) {
   const grid = panel.querySelector<HTMLElement>('.shape-swatches')!;
   const applyBoard = panel.querySelector<HTMLButtonElement>('.shape-apply-board')!;
+  const cardText = panel.querySelector<HTMLButtonElement>('.shape-card-text')!;
+  panel.querySelector<HTMLButtonElement>('.shape-tidy-board')!.addEventListener('click', () => host.tidyBoard());
+  const cardTargets = () => { const editable = editableNodeIds(host.getDocument()); return host.getSelection().filter(n => isPresetShape(n) && n.kind !== 'frame' && editable.has(n.id) && !n.textRuns?.length && (!n.contentMode || n.contentMode === 'text')); };
+  cardText.addEventListener('click', () => {
+    const nodes = cardTargets(); if (!nodes.length) return;
+    const on = !nodes.every(n => n.textStyle === 'card');
+    host.mutate(() => { for (const node of nodes) { if (on) node.textStyle = 'card'; else delete node.textStyle; } });
+  });
   const swatches = SHAPE_TONES.flatMap(tone => SHAPE_THEMES.map(theme => ({theme,tone,colors:theme[tone]})));
   let chosen = swatches[0];
   panel.addEventListener('keydown', event => {
@@ -58,5 +67,8 @@ export function mountStylePresetsPanel(panel: HTMLElement, host: {
       button.setAttribute('aria-pressed', String(swatches[i] === common));
     });
     applyBoard.textContent = t('보드 전체에 적용 · {0}', chosen.theme.name);
+    const cards = cardTargets();
+    cardText.disabled = !cards.length;
+    cardText.setAttribute('aria-pressed', String(!!cards.length && cards.every(n => n.textStyle === 'card')));
   };
 }

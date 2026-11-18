@@ -12,6 +12,7 @@ import {edgePoints,intersects} from './geometry.ts';
 import {addAttachment,removeAttachment,previewSourceRelink,applySourceRelink} from './attachments.ts';
 import {createSample} from './sample.ts';
 import {DEFAULT_CONNECTOR} from './style-defaults.ts';
+import {tidyBoard} from './shape-themes.ts';
 
 export class CommandError extends Error {code:string;details:unknown;constructor(code:string,message:string,details?:unknown){super(message);this.code=code;this.details=details;}}
 export type Schema=Record<string,any>;
@@ -23,7 +24,7 @@ const ids={type:'array',items:S,minItems:1,maxItems:10000};
 const en=(...values:string[])=>({type:'string',enum:values});
 const object=(properties:Record<string,Schema>,required:string[]=[]):Schema=>({type:'object',properties,required,additionalProperties:false});
 const point=object({x:N,y:N},['x','y']);
-const nodeFields=['kind','text','x','y','w','h','fill','stroke','color','fontSize','bold','align','strokeWidth','dashed','locked','groupId','assetId','points','opacity','details','crop','rotation','customPorts','textRuns','contentMode','table'];
+const nodeFields=['kind','text','x','y','w','h','fill','stroke','color','fontSize','bold','align','strokeWidth','dashed','locked','groupId','assetId','points','opacity','details','crop','rotation','customPorts','textRuns','contentMode','table','textStyle'];
 const edgeFields=['from','to','fromPort','toPort','label','color','width','style','dashed','arrow','waypoints','relation','labelPosition','fromAnchor','toAnchor','condition','labelBackground','labelAngle'];
 export const nodeProperties=object(Object.fromEntries(nodeFields.map(k=>[k,{}])));
 export const edgeProperties=object(Object.fromEntries(edgeFields.map(k=>[k,{}])));
@@ -37,6 +38,7 @@ for(const k of ['groupId','assetId'])nodeProperties.properties[k]=optional(S);
 nodeProperties.properties.points=optional({type:'array',items:point});
 nodeProperties.properties.crop=optional(object({x:N,y:N,w:N,h:N},['x','y','w','h']));
 nodeProperties.properties.contentMode=optional(en('text','table','checklist'));
+nodeProperties.properties.textStyle=optional(en('card'));
 nodeProperties.properties.textRuns=optional({type:'array',items:object({text:S,bold:B,color:S,fontSize:N,href:S},['text'])});
 nodeProperties.properties.table=optional(object({columns:{type:'array',items:S},rows:{type:'array',items:{type:'array',items:S}}},['columns','rows']));
 nodeProperties.properties.customPorts=optional({type:'array',items:object({id:S,point},['id','point'])});
@@ -99,6 +101,7 @@ def('layout.apply','공통 자동 배치 엔진 적용.',layoutSchema,true,(c,a)
 def('group.create','선택 요소를 중첩 가능한 그룹으로 묶기.',object({ids,name:S,parentId:S},['ids']),true,(c,a)=>{editable(c,a.ids);return {id:org.createGroup(c.doc,a.ids,a.name,a.parentId)};});
 def('group.update','그룹 이름·설명·접기·상위 그룹 지정.',object({id:S,name:S,description:S,collapsed:B,parentId:S},['id']),true,(c,a)=>{const g=org.ensureWorkspace(c.doc).groups!.find(g=>g.id===a.id)??fail('NOT_FOUND','그룹 없음');if(a.parentId!==undefined)org.setGroupParent(c.doc,a.id,a.parentId||undefined);for(const k of ['name','description','collapsed'])if(a[k]!==undefined)(g as any)[k]=a[k];});
 def('group.ungroup','그룹 해제.',object({id:S},['id']),true,(c,a)=>org.ungroup(c.doc,a.id));
+def('board.tidy','오래된 보드를 프리셋 색·1px 테두리·카드형 글자·차분한 연결선 굵기로 정돈. 점선·글자·메모·영역·이미지는 유지.',object({}),true,c=>({changed:tidyBoard(c.doc,org.editableNodeIds(c.doc,true))}));
 def('group.resize','그룹 전체 비율 변경.',object({id:S,scale:N},['id','scale']),true,(c,a)=>org.resizeGroup(c.doc,a.id,a.scale));
 def('group.members','그룹 안팎으로 요소 편입.',object({ids,groupId:S},['ids']),true,(c,a)=>{editable(c,a.ids);org.reparentDroppedNodes(c.doc,a.ids,a.groupId);});
 for(const kind of ['page','layer'] as const){

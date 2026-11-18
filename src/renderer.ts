@@ -215,9 +215,9 @@ function drawNode(ctx: CanvasRenderingContext2D, node: FlowNode, bitmap?: Bitmap
     if (node.fill !== 'transparent') {
       const depth = effects !== 'flat' && hasDepth(node);
       if (depth && effects === 'rich') {
-        ctx.shadowColor = 'rgba(16,24,40,.06)'; ctx.shadowOffsetY = pixelScale; ctx.shadowBlur = 2 * pixelScale;
+        ctx.shadowColor = 'rgba(16,24,40,.08)'; ctx.shadowOffsetY = pixelScale; ctx.shadowBlur = 2 * pixelScale;
         ctx.fill();
-        ctx.shadowColor = 'rgba(16,24,40,.09)'; ctx.shadowOffsetY = 4 * pixelScale; ctx.shadowBlur = 12 * pixelScale;
+        ctx.shadowColor = 'rgba(16,24,40,.13)'; ctx.shadowOffsetY = 5 * pixelScale; ctx.shadowBlur = 16 * pixelScale;
         ctx.fill();
         ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
         ctx.save(); ctx.clip();
@@ -230,7 +230,7 @@ function drawNode(ctx: CanvasRenderingContext2D, node: FlowNode, bitmap?: Bitmap
         ctx.restore();
       } else {
         if (depth) {
-          ctx.save(); ctx.translate(0, 2); pathNode(ctx, node); ctx.fillStyle = 'rgba(16,24,40,.09)'; ctx.fill(); ctx.restore();
+          ctx.save(); ctx.translate(0, 2); pathNode(ctx, node); ctx.fillStyle = 'rgba(16,24,40,.12)'; ctx.fill(); ctx.restore();
           pathNode(ctx, node);
         }
         ctx.fill();
@@ -723,7 +723,7 @@ export function renderSVG(doc: FlowDocument): string {
   const paths=new Map(doc.edges.map(e=>[e.id,edgePoints(e,doc,nodeIndex)]));
   const labels=layoutEdgeLabels(doc,paths,measure?t=>measure.measureText(t).width:undefined);
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${n(box.x)} ${n(box.y)} ${n(box.w)} ${n(box.h)}" width="${n(box.w)}" height="${n(box.h)}" role="img"><title>${escape(doc.title)}</title><rect x="${n(box.x)}" y="${n(box.y)}" width="${n(box.w)}" height="${n(box.h)}" fill="white"/>`);
-  const defs = `<defs><filter id="shape-depth" x="-30%" y="-30%" width="160%" height="165%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#101828" flood-opacity=".12"/></filter><linearGradient id="shape-light" x2="0" y2="1"><stop stop-color="white" stop-opacity=".07"/><stop offset=".08" stop-color="white" stop-opacity=".025"/><stop offset="1" stop-color="#101828" stop-opacity=".025"/></linearGradient></defs>`;
+  const defs = `<defs><filter id="shape-depth" x="-30%" y="-30%" width="160%" height="165%" color-interpolation-filters="sRGB"><feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#101828" flood-opacity=".16"/></filter><linearGradient id="shape-light" x2="0" y2="1"><stop stop-color="white" stop-opacity=".07"/><stop offset=".08" stop-color="white" stop-opacity=".025"/><stop offset="1" stop-color="#101828" stop-opacity=".025"/></linearGradient></defs>`;
   for (const edge of doc.edges) {
     const points = visualEdgePoints(paths.get(edge.id)!,edge,nodeIndex);
     if (points.length < 2) continue;

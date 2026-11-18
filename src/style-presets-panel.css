@@ -6,3 +6,5 @@
 .shape-swatches button[aria-pressed="true"]::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .shape-swatches button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .shape-apply-board { width: 100%; }
+.shape-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 7px; }
+.shape-card-text[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-text); }

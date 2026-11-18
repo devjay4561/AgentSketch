@@ -8,6 +8,7 @@ import {mountWorkbench} from './workbench.ts';
 import {projectVisibleDocument,editableNodeIds,groupMembers,topGroupId,DEFAULT_PAGE,createGroup,ungroup,reparentDroppedNodes} from './organization.ts';
 import {applyNodeDefaults,applyEdgeDefaults,DEFAULT_CONNECTOR} from './style-defaults.ts';
 import { mountStylePresetsPanel } from './style-presets-panel.ts';
+import { tidyBoard } from './shape-themes.ts';
 import { setGraphicsProfile } from './graphics.ts';
 import {addNextStep,splitConnection} from './diagram-actions.ts';
 import {setNodePlainText} from './rich-text.ts';
@@ -647,6 +648,7 @@ async function runAction(action: string) {
     case 'redo': { finishEdit(); const next = history.redo(doc); if (next) { next.viewport = { ...doc.viewport }; doc = next; selected.clear(); selectedEdge = null; connecting = null; changed(); } break; }
     case 'image': pickImages(); break;
     case 'fit': fit(); break;
+    case 'tidy-board': { if (!tidyBoard(cloneDocument(doc), editableNodeIds(doc, true))) { toast('이미 정돈된 보드입니다.'); break; } mutate(() => { tidyBoard(doc, editableNodeIds(doc, true)); }, '보드를 다듬었습니다. Ctrl+Z로 되돌릴 수 있습니다.'); break; }
     case 'fit-selection': fit(selectedNodes().length ? selectedNodes() : doc.nodes); break;
     case 'zoom-in': zoomAt(doc.viewport.zoom * 1.2); break;
     case 'zoom-out': zoomAt(doc.viewport.zoom / 1.2); break;
@@ -725,7 +727,7 @@ canvas.addEventListener('contextmenu', e => {
   e.preventDefault(); finishEdit(); const p = worldPoint(e), n = hitNode(p), edge = n ? undefined : hitEdge(p);
   if (n && !selected.has(n.id)) select(expandGroup(n)); else if (edge) select([], edge.id);
   const menu = $('context-menu');
-  const entries = n || selected.size ? [['next-step', '다음 단계 추가', ''], ['duplicate', '복제', 'Ctrl+D'], ['copy', '복사', 'Ctrl+C'], ['group', '묶기', 'Ctrl+G'], ['ungroup', '묶기 해제', 'Ctrl+Shift+G'], ['front', '맨 앞으로', ']'], ['back', '맨 뒤로', '['], ['lock', selectedNodes().every(n => n.locked) ? '잠금 해제' : '잠금', 'Ctrl+L'], ['fit-selection', '선택 요소로 이동', 'Shift+1'], ['delete', '삭제', 'Delete']] : edge ? [['delete', '연결선 삭제', 'Delete']] : [['paste', '붙여넣기', 'Ctrl+V'], ['fit', '전체 보기', '1'], ['image', '이미지 추가', ''], ['help', '단축키 보기', '?']];
+  const entries = n || selected.size ? [['next-step', '다음 단계 추가', ''], ['duplicate', '복제', 'Ctrl+D'], ['copy', '복사', 'Ctrl+C'], ['group', '묶기', 'Ctrl+G'], ['ungroup', '묶기 해제', 'Ctrl+Shift+G'], ['front', '맨 앞으로', ']'], ['back', '맨 뒤로', '['], ['lock', selectedNodes().every(n => n.locked) ? '잠금 해제' : '잠금', 'Ctrl+L'], ['fit-selection', '선택 요소로 이동', 'Shift+1'], ['delete', '삭제', 'Delete']] : edge ? [['delete', '연결선 삭제', 'Delete']] : [['paste', '붙여넣기', 'Ctrl+V'], ['fit', '전체 보기', '1'], ['tidy-board', '보드 다듬기', ''], ['image', '이미지 추가', ''], ['help', '단축키 보기', '?']];
   if(n?.details?.documentPath)entries.unshift(['open-linked-document','연결 문서 열기','Enter'],['relink-document','문서 다시 연결',''],['unlink-document','문서 연결 해제','']);
   menu.innerHTML = entries.map(([a, text, key]) => `<button data-action="${a}"><span>${text}</span><kbd>${key}</kbd></button>`).join('');
   menu.hidden = false; menu.style.left = `${Math.min(e.clientX, window.innerWidth - 236)}px`; menu.style.top = `${Math.max(8, Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 12))}px`;
@@ -860,6 +862,7 @@ const updateStylePresets = mountStylePresetsPanel($('shape-presets'), {
   confirmBoardTheme: async family => await confirmChoice(t('{0} 테마를 보드 전체에 적용할까요?', family),
     t('편집할 수 있는 도형의 색상이 바뀝니다. 실행 취소로 되돌릴 수 있습니다.'),
     [{label:t('적용'),value:'apply'},{label:t('취소'),value:'cancel'}]) === 'apply',
+  tidyBoard: () => void action('tidy-board'),
 });
 workbench=mountWorkbench(workbenchHost);
 void initialize();

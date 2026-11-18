@@ -1,7 +1,7 @@
 import type { FlowDocument, FlowNode, Point } from './types.ts';
 import { bounds, edgePoints, prepareRoutes } from './geometry.ts';
 import {EDGE_LABEL_LINE,EDGE_LABEL_SIZE,layoutEdgeLabels} from './edge-labels.ts';
-import {layoutRichContent} from './rich-render.ts';
+import {cardTextRuns,layoutRichContent} from './rich-render.ts';
 import {diamondPath,edgeArrows,edgeSvgPath,roundRectPath,shapeRadius,textBox,visualEdgePoints} from './renderer.ts';
 import {planPages,MAX_PDF_PAGES} from './pdf-pagination.ts';
 import type {PdfPrintOptions} from './pdf-pagination.ts';
@@ -90,7 +90,7 @@ export async function createPowerPoint(doc:FlowDocument,options:ExportOptions={}
    });
    if(n.kind==='image'){const data=await imageData(board,n);if(data)slide.addImage({...p,data});}
    if(n.contentMode==='table'&&n.table){const rows=[n.table.columns,...n.table.rows],tp=pos(textBox(n)),titleH=n.text?Math.min(tp.h*.2,n.fontSize*scale*1.6):0;if(n.text)slide.addText(n.text,{x:tp.x,y:tp.y,w:tp.w,h:titleH,fontFace:'Pretendard',fontSize:Math.max(1,n.fontSize*scale*72),bold:true,color:hex(n.color),margin:0,fit:'shrink'});slide.addTable(rows.map((row,i)=>row.map(text=>({text,options:{bold:i===0,fill:{color:i===0?'FFF0E5':'FFFFFF'}}}))),{...tp,y:tp.y+titleH,h:tp.h-titleH,fontFace:'Pretendard',fontSize:Math.max(1,Math.min(n.fontSize*scale*72,(tp.h-titleH)/rows.length*50)),color:hex(n.color),rowH:(tp.h-titleH)/rows.length,colW:tp.w/n.table.columns.length,margin:2,border:{type:'solid',pt:.5,color:hex(n.stroke)},autoPage:false});}
-   else if(nodeExportText(n)&&n.kind!=='draw')slide.addText(n.textRuns&&n.contentMode!=='table'&&n.contentMode!=='checklist'?n.textRuns.map(run=>({text:run.text,options:{bold:run.bold??n.bold,color:hex(run.color??n.color,'1C2024'),fontSize:Math.max(1,(run.fontSize??n.fontSize)*scale*72),...(run.href?{hyperlink:{url:run.href}}:{})}})):nodeExportText(n),{...p,margin:Math.min(.08,p.w*.05),fontFace:'Pretendard',fontSize:Math.max(1,n.fontSize*scale*72),color:hex(n.color,'1C2024'),bold:n.bold,align:n.align,valign:n.kind==='text'||n.kind==='note'||n.kind==='frame'?'top':'middle',breakLine:false,fit:'shrink'});
+   else if(nodeExportText(n)&&n.kind!=='draw')slide.addText((n.textRuns??cardTextRuns(n))&&n.contentMode!=='table'&&n.contentMode!=='checklist'?(n.textRuns??cardTextRuns(n))!.map(run=>({text:run.text,options:{bold:run.bold??n.bold,color:hex(run.color??n.color,'1C2024'),fontSize:Math.max(1,(run.fontSize??n.fontSize)*scale*72),...(run.href?{hyperlink:{url:run.href}}:{})}})):nodeExportText(n),{...p,margin:Math.min(.08,p.w*.05),fontFace:'Pretendard',fontSize:Math.max(1,n.fontSize*scale*72),color:hex(n.color,'1C2024'),bold:n.bold,align:n.align,valign:n.kind==='text'||n.kind==='note'||n.kind==='frame'?'top':'middle',breakLine:false,fit:'shrink'});
   };
   for(const n of board.nodes.filter(n=>n.kind==='frame'))await paintNode(n);
   for(const e of board.edges){
@@ -121,7 +121,7 @@ export async function createVectorPDF(doc:FlowDocument,fontBytes:Uint8Array,opti
  const lib=await import('pdf-lib'),{default:fontkit}=await import('@pdf-lib/fontkit');const pdf=await lib.PDFDocument.create();pdf.registerFontkit(fontkit);pdf.setTitle(doc.title);pdf.setCreator('AgentSketch');
  // Current fontkit subsets lose Pretendard glyph outlines; embed renamed static faces in full.
  const font=await pdf.embedFont(fontBytes,{subset:false});
- const needsBold=boards.some(board=>board.nodes.some(n=>n.bold||n.contentMode==='table'||n.contentMode==='checklist'&&!!n.text||n.textRuns?.some(run=>run.bold)));
+ const needsBold=boards.some(board=>board.nodes.some(n=>n.bold||n.contentMode==='table'||n.contentMode==='checklist'&&!!n.text||n.textRuns?.some(run=>run.bold)||!!cardTextRuns(n)));
  let boldBytes=options.boldFontBytes;
  if(needsBold&&!boldBytes&&typeof window!=='undefined'){const response=await fetch('/fonts/AgentSketchExport-Semibold.ttf');if(!response.ok)throw new Error('굵은 PDF 글꼴을 불러오지 못했습니다.');boldBytes=new Uint8Array(await response.arrayBuffer());}
  if(needsBold&&!boldBytes)throw new Error('굵은 본문이 있는 PDF에는 boldFontBytes 글꼴이 필요합니다.');
@@ -141,7 +141,7 @@ export async function createVectorPDF(doc:FlowDocument,fontBytes:Uint8Array,opti
    page.pushOperators(lib.pushGraphicsState(),lib.rectangle(clip.x,clip.y,clip.w,clip.h),lib.clip(),lib.endPath());
    const segment=(a:Point,z:Point,stroke:string,width:number,dashed=false)=>{if(visible({x:Math.min(a.x,z.x)-width,y:Math.min(a.y,z.y)-width,w:Math.abs(a.x-z.x)+2*width,h:Math.abs(a.y-z.y)+2*width}))page.drawLine({start:{x:x(a.x),y:y(a.y)},end:{x:x(z.x),y:y(z.y)},color:color(stroke),thickness:Math.max(.2,width*scale),...(dashed?{dashArray:[4*scale,3*scale]}:{})});};
    const paintContent=(node:FlowNode)=>{
-    const box=textBox(node),renderNode=node.textRuns?.length||node.contentMode==='table'||node.contentMode==='checklist'?node:{...node,textRuns:[{text:node.text}]};
+    const box=textBox(node),renderNode=node.textRuns?.length||cardTextRuns(node)||node.contentMode==='table'||node.contentMode==='checklist'?node:{...node,textRuns:[{text:node.text}]};
     const layout=layoutRichContent(renderNode,box,(text,size,bold)=>(bold?boldFont:font).widthOfTextAtSize(text,size));if(!layout)return;
     const extent=Math.max(1,...layout.rects.map(r=>r.y+r.h),...layout.texts.map(t=>t.y+t.fontSize*.725));
     const left=Math.min(0,...layout.rects.map(r=>r.x),...layout.texts.map(t=>t.x));

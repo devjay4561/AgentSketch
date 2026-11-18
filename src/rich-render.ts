@@ -14,6 +14,25 @@ const font=(size:number,bold:boolean,family:string)=>`${bold?600:400} ${size}px 
 /** Latin words (with attached digits and punctuation) wrap whole; Hangul and other text wraps per character. */
 // Korean wraps at spaces (keep-all), like Latin words; a word wider than the box still breaks per character.
 export const WRAP_TOKENS=/[\p{Script=Latin}\p{Script=Hangul}\d'’\-_.,:;!?()/&%+#@=~·]+|\s|./gsu;
+const hex=(value:string)=>/^#([\da-f]{6})/i.exec(value)?.[1];
+function mix(a:string,b:string,amount:number):string{
+  const x=hex(a),y=hex(b);if(!x)return a;const z=y??'ffffff';
+  const c=(s:string,i:number)=>parseInt(s.slice(i,i+2),16);
+  return '#'+[0,2,4].map(i=>Math.round(c(x,i)+(c(z,i)-c(x,i))*amount).toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+/** Card text: a bold title line, quieter detail lines and quietest '※' notes. Runs join back to the exact text. */
+export function cardTextRuns(node:FlowNode):TextRun[]|undefined{
+  if(node.textStyle!=='card'||node.textRuns?.length||(node.contentMode&&node.contentMode!=='text')||!node.text.includes('\n'))return;
+  const background=node.fill==='transparent'?'#FFFFFF':node.fill;
+  const lines=node.text.split('\n');
+  return lines.map((line,i)=>{
+    const text=i<lines.length-1?line+'\n':line;
+    if(i===0)return {text,bold:true,color:node.color};
+    return {text,bold:false,color:mix(node.color,background,/^\s*[※*]/.test(line)?.5:.3)};
+  });
+}
+const withCard=(node:FlowNode):RichNode=>{const runs=cardTextRuns(node);return runs?{...node,textRuns:runs}:node;};
+const hasRich=(node:RichNode)=>!!(node.textRuns?.length||node.contentMode==='table'||node.contentMode==='checklist'||cardTextRuns(node));
 const fallbackMeasure:Measure=(text,size)=>[...text].reduce((n,c)=>n+size*(c.charCodeAt(0)>255?1:.55),0);
 
 /** Whole text is retained in this layout; the caller chooses the visible node box. */
@@ -88,18 +107,18 @@ function makeLayout(node:RichNode,box:Box,measure:Measure):ContentLayout|null {
   return null;
 }
 function cachedLayout(node:RichNode,box:Box,measure:Measure):ContentLayout|null {
-  const signature=JSON.stringify([box.w,box.h,node.text,node.textRuns,node.table,node.contentMode,node.details?.checklist,node.fontSize,node.bold,node.color,node.align,node.kind,measure('한글 Ab',node.fontSize,node.bold)]);
+  const signature=JSON.stringify([box.w,box.h,node.text,node.textRuns,node.table,node.contentMode,node.details?.checklist,node.fontSize,node.bold,node.color,node.align,node.kind,node.textStyle,node.fill,measure('한글 Ab',node.fontSize,node.bold)]);
   const previous=layouts.get(node);if(previous?.signature===signature)return previous.layout;
-  const layout=makeLayout(node,box,measure);
+  const layout=makeLayout(withCard(node),box,measure);
   // Keep a single current layout per live node and avoid retaining giant exports.
   if(!layout||layout.texts.length+layout.rects.length<10000)layouts.set(node,{signature,layout});
   return layout;
 }
 
 export function measureRichContentHeight(node:FlowNode,width:number,fontFamily:string,context?:CanvasRenderingContext2D|null):number|null {
-  if(!node.textRuns?.length&&node.contentMode!=='table'&&node.contentMode!=='checklist')return null;
+  if(!hasRich(node))return null;
   const measure:Measure=context?(text,size,bold)=>{context.font=font(size,bold,fontFamily);return context.measureText(text).width;}:fallbackMeasure;
-  const layout=makeLayout(node,{x:0,y:0,w:Math.max(1,width),h:0},measure);if(!layout)return null;
+  const layout=makeLayout(withCard(node),{x:0,y:0,w:Math.max(1,width),h:0},measure);if(!layout)return null;
   let height=0;for(const r of layout.rects)height=Math.max(height,r.y+r.h);for(const t of layout.texts)height=Math.max(height,t.y+t.fontSize*.725);return height;
 }
 
@@ -120,7 +139,7 @@ function fitContent(layout:ContentLayout,box:Box,measure:Measure) {
 }
 
 export function renderRichContent(ctx:CanvasRenderingContext2D,node:FlowNode,box:Box,fontFamily:string,fit=false):boolean {
-  const rich=node as RichNode;if(!rich.textRuns?.length&&rich.contentMode!=='table'&&rich.contentMode!=='checklist')return false;
+  const rich=node as RichNode;if(!hasRich(rich))return false;
   const measure:Measure=(text,size,bold)=>{ctx.font=font(size,bold,fontFamily);return ctx.measureText(text).width;};
   ctx.save();const layout=cachedLayout(rich,box,measure);if(!layout){ctx.restore();return false;}
   ctx.beginPath();ctx.rect(box.x,box.y,Math.max(0,box.w),Math.max(0,box.h));ctx.clip();ctx.translate(box.x,box.y);ctx.setLineDash([]);
@@ -132,7 +151,7 @@ export function renderRichContent(ctx:CanvasRenderingContext2D,node:FlowNode,box
   ctx.restore();return true;
 }
 export function svgRichContent(node:FlowNode,box:Box,fontFamily:string,measureContext?:CanvasRenderingContext2D|null,fit=false):string|null {
-  const rich=node as RichNode;if(!rich.textRuns?.length&&rich.contentMode!=='table'&&rich.contentMode!=='checklist')return null;
+  const rich=node as RichNode;if(!hasRich(rich))return null;
   const measure:Measure=measureContext?(text,size,bold)=>{measureContext.font=font(size,bold,fontFamily);return measureContext.measureText(text).width;}:fallbackMeasure;
   const layout=cachedLayout(rich,box,measure);if(!layout)return null;
   const fitTransform=fit?fitContent(layout,box,measure):{x:0,scale:1};
