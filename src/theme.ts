@@ -9,7 +9,7 @@ export const PALETTE = {
   ink: '#1C2024',
   muted: '#606B78',
   border: '#CBD2DA',
-  line: '#7B8798',
+  line: '#627289',
   frame: '#EFF2F6',
   note: '#FFF3EB',
   noteBorder: '#F5A36A',

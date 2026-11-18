@@ -1,8 +1,8 @@
 import type { FlowDocument, FlowNode, Point } from './types.ts';
 import { bounds, edgePoints, prepareRoutes } from './geometry.ts';
-import {layoutEdgeLabels} from './edge-labels.ts';
+import {EDGE_LABEL_LINE,EDGE_LABEL_SIZE,layoutEdgeLabels} from './edge-labels.ts';
 import {layoutRichContent} from './rich-render.ts';
-import {textBox} from './renderer.ts';
+import {diamondPath,edgeArrows,edgeSvgPath,roundRectPath,shapeRadius,textBox,visualEdgePoints} from './renderer.ts';
 import {planPages,MAX_PDF_PAGES} from './pdf-pagination.ts';
 import type {PdfPrintOptions} from './pdf-pagination.ts';
 import {t} from './i18n.ts';
@@ -77,17 +77,35 @@ export async function createPowerPoint(doc:FlowDocument,options:ExportOptions={}
   slide.addText(board.title,{x:.36,y:.18,w:12.6,h:.3,fontFace:'Pretendard',fontSize:14,bold:true,color:'1C2024',margin:0});
   const pos=(n:{x:number;y:number;w:number;h:number})=>({x:ox+n.x*scale,y:oy+n.y*scale,w:n.w*scale,h:n.h*scale});
   const index=new Map(board.nodes.map(n=>[n.id,n]));prepareRoutes(board,index);const paths=new Map(board.edges.map(e=>[e.id,edgePoints(e,board,index)])),labels=layoutEdgeLabels(board,paths);
-  const segment=(a:Point,z:Point,color:string,width:number,arrow?:'end'|'start'|'both',dash=false)=>slide.addShape(pptx.ShapeType.line,{x:ox+Math.min(a.x,z.x)*scale,y:oy+Math.min(a.y,z.y)*scale,w:Math.abs(a.x-z.x)*scale,h:Math.abs(a.y-z.y)*scale,flipH:z.x<a.x,flipV:z.y<a.y,line:{color:hex(color,'667085'),width:Math.max(.25,width*scale*72),...(dash?{dashType:'dash' as const}:{}),...(arrow==='both'?{beginArrowType:'triangle' as const,endArrowType:'triangle' as const}:arrow==='end'?{endArrowType:'triangle' as const}:arrow==='start'?{beginArrowType:'triangle' as const}:{})}});
+  const segment=(a:Point,z:Point,color:string,width:number,arrow?:'end'|'start'|'both',dash=false)=>slide.addShape(pptx.ShapeType.line,{
+   x:ox+Math.min(a.x,z.x)*scale,y:oy+Math.min(a.y,z.y)*scale,w:Math.abs(a.x-z.x)*scale,h:Math.abs(a.y-z.y)*scale,flipH:z.x<a.x,flipV:z.y<a.y,
+   line:{color:hex(color,'667085'),width:Math.max(.25,width*scale*72),dashType:dash?'dash':undefined,
+    beginArrowType:arrow==='start'||arrow==='both'?'stealth':undefined,endArrowType:arrow==='end'||arrow==='both'?'stealth':undefined},
+  });
   const paintNode=async(n:FlowNode)=>{
-   const p=pos(n),line={color:hex(n.stroke),width:Math.max(0,n.strokeWidth*scale*72),transparency:n.stroke==='transparent'?100:0};
+   const p=pos(n),line={color:hex(n.stroke),width:n.strokeWidth*scale*72,transparency:n.stroke==='transparent'||!n.strokeWidth?100:Math.round((1-(n.opacity??1))*100),dashType:n.dashed?'dash' as const:undefined};
    if(n.kind==='draw')for(let i=1;i<(n.points?.length??0);i++)segment({x:n.x+n.points![i-1].x,y:n.y+n.points![i-1].y},{x:n.x+n.points![i].x,y:n.y+n.points![i].y},n.stroke,n.strokeWidth,undefined,n.dashed);
-   else if(n.kind!=='text'&&n.kind!=='image')slide.addShape(n.kind==='ellipse'?pptx.ShapeType.ellipse:n.kind==='diamond'?pptx.ShapeType.diamond:n.kind==='round'||n.kind==='frame'?pptx.ShapeType.roundRect:pptx.ShapeType.rect,{...p,fill:{color:hex(n.fill),transparency:n.fill==='transparent'?100:Math.round((1-(n.opacity??1))*100)},line});
+   else if(n.kind!=='text'&&n.kind!=='image')slide.addShape(n.kind==='ellipse'?pptx.ShapeType.ellipse:n.kind==='diamond'?pptx.ShapeType.diamond:pptx.ShapeType.roundRect,{
+    ...p,rectRadius:shapeRadius(n)*scale,fill:{color:hex(n.fill),transparency:n.fill==='transparent'?100:Math.round((1-(n.opacity??1))*100)},line,
+   });
    if(n.kind==='image'){const data=await imageData(board,n);if(data)slide.addImage({...p,data});}
    if(n.contentMode==='table'&&n.table){const rows=[n.table.columns,...n.table.rows],tp=pos(textBox(n)),titleH=n.text?Math.min(tp.h*.2,n.fontSize*scale*1.6):0;if(n.text)slide.addText(n.text,{x:tp.x,y:tp.y,w:tp.w,h:titleH,fontFace:'Pretendard',fontSize:Math.max(1,n.fontSize*scale*72),bold:true,color:hex(n.color),margin:0,fit:'shrink'});slide.addTable(rows.map((row,i)=>row.map(text=>({text,options:{bold:i===0,fill:{color:i===0?'FFF0E5':'FFFFFF'}}}))),{...tp,y:tp.y+titleH,h:tp.h-titleH,fontFace:'Pretendard',fontSize:Math.max(1,Math.min(n.fontSize*scale*72,(tp.h-titleH)/rows.length*50)),color:hex(n.color),rowH:(tp.h-titleH)/rows.length,colW:tp.w/n.table.columns.length,margin:2,border:{type:'solid',pt:.5,color:hex(n.stroke)},autoPage:false});}
    else if(nodeExportText(n)&&n.kind!=='draw')slide.addText(n.textRuns&&n.contentMode!=='table'&&n.contentMode!=='checklist'?n.textRuns.map(run=>({text:run.text,options:{bold:run.bold??n.bold,color:hex(run.color??n.color,'1C2024'),fontSize:Math.max(1,(run.fontSize??n.fontSize)*scale*72),...(run.href?{hyperlink:{url:run.href}}:{})}})):nodeExportText(n),{...p,margin:Math.min(.08,p.w*.05),fontFace:'Pretendard',fontSize:Math.max(1,n.fontSize*scale*72),color:hex(n.color,'1C2024'),bold:n.bold,align:n.align,valign:n.kind==='text'||n.kind==='note'||n.kind==='frame'?'top':'middle',breakLine:false,fit:'shrink'});
   };
   for(const n of board.nodes.filter(n=>n.kind==='frame'))await paintNode(n);
-  for(const e of board.edges){const ps=edgePoints(e,board,index);if(ps.length<2){warnings.add('경로를 찾지 못한 연결선은 내보내지 않았습니다. 보드의 경로 없음 표시를 확인하세요.');continue;}for(let i=1;i<ps.length;i++)segment(ps[i-1],ps[i],e.color,e.width,ps.length===2&&e.arrow==='both'?'both':i===ps.length-1&&e.arrow!=='none'?'end':i===1&&e.arrow==='both'?'start':undefined,e.dashed);const label=labels.get(e.id);if(label){for(let j=1;j<label.leader.length;j++)segment(label.leader[j-1],label.leader[j],e.color,.7,undefined,true);slide.addText(label.lines.join('\n'),{...pos({x:label.center.x-label.textWidth/2,y:label.center.y-label.textHeight/2,w:label.textWidth,h:label.textHeight}),rotate:label.angle,fontFace:'Pretendard',fontSize:12*scale*72,align:'center',valign:'middle',color:hex(e.color),fill:{color:hex(e.labelBackground??'#FFFFFF')},margin:0,fit:'shrink'});}}
+  for(const e of board.edges){
+   const ps=paths.get(e.id)!;
+   if(ps.length<2){warnings.add('경로를 찾지 못한 연결선은 내보내지 않았습니다. 보드의 경로 없음 표시를 확인하세요.');continue;}
+   for(let i=1;i<ps.length;i++)segment(ps[i-1],ps[i],e.color,e.width,ps.length===2&&e.arrow==='both'?'both':i===ps.length-1&&e.arrow!=='none'?'end':i===1&&e.arrow==='both'?'start':undefined,e.dashed);
+   const label=labels.get(e.id);
+   if(label){
+    for(let j=1;j<label.leader.length;j++)segment(label.leader[j-1],label.leader[j],e.color,.8);
+    const p=pos({x:label.center.x-label.textWidth/2,y:label.center.y-label.textHeight/2,w:label.textWidth,h:label.textHeight});
+    slide.addShape(pptx.ShapeType.roundRect,{...p,rotate:label.angle,rectRadius:Math.min(p.w,p.h)/2,
+     line:{color:hex(e.color),width:scale*72,transparency:75},fill:{color:hex(e.labelBackground??'#FFFFFF'),transparency:e.labelBackground==='transparent'?100:0}});
+    slide.addText(label.lines.join('\n'),{...p,rotate:label.angle,fontFace:'Pretendard Medium',fontSize:EDGE_LABEL_SIZE*scale*72,align:'center',valign:'middle',color:hex(e.color),margin:0,fit:'shrink'});
+   }
+  }
   for(const n of board.nodes.filter(n=>n.kind!=='frame'))await paintNode(n);
  }
  return {base64:await pptx.write({outputType:'base64'}) as string,warnings:[...warnings]};
@@ -122,7 +140,6 @@ export async function createVectorPDF(doc:FlowDocument,fontBytes:Uint8Array,opti
    page.drawText(title,{x:clip.x,y:clip.y+clip.h+8,font,size:titleSize,color:color('#1C2024')});
    page.pushOperators(lib.pushGraphicsState(),lib.rectangle(clip.x,clip.y,clip.w,clip.h),lib.clip(),lib.endPath());
    const segment=(a:Point,z:Point,stroke:string,width:number,dashed=false)=>{if(visible({x:Math.min(a.x,z.x)-width,y:Math.min(a.y,z.y)-width,w:Math.abs(a.x-z.x)+2*width,h:Math.abs(a.y-z.y)+2*width}))page.drawLine({start:{x:x(a.x),y:y(a.y)},end:{x:x(z.x),y:y(z.y)},color:color(stroke),thickness:Math.max(.2,width*scale),...(dashed?{dashArray:[4*scale,3*scale]}:{})});};
-   const arrow=(tip:Point,from:Point,stroke:string,width:number)=>{const angle=Math.atan2(tip.y-from.y,tip.x-from.x),length=Math.max(9,width*4);for(const sign of [-1,1])segment(tip,{x:tip.x-length*Math.cos(angle+sign*Math.PI/6),y:tip.y-length*Math.sin(angle+sign*Math.PI/6)},stroke,width);};
    const paintContent=(node:FlowNode)=>{
     const box=textBox(node),renderNode=node.textRuns?.length||node.contentMode==='table'||node.contentMode==='checklist'?node:{...node,textRuns:[{text:node.text}]};
     const layout=layoutRichContent(renderNode,box,(text,size,bold)=>(bold?boldFont:font).widthOfTextAtSize(text,size));if(!layout)return;
@@ -142,11 +159,13 @@ export async function createVectorPDF(doc:FlowDocument,fontBytes:Uint8Array,opti
     if(!visible({x:n.x-n.strokeWidth,y:n.y-n.strokeWidth,w:n.w+2*n.strokeWidth,h:n.h+2*n.strokeWidth}))return;
     const fill=n.fill==='transparent'?undefined:color(n.fill),border=n.stroke==='transparent'?undefined:color(n.stroke),w=n.w*scale,h=n.h*scale;
     if(n.kind==='draw'){for(let i=1;i<(n.points?.length??0);i++)segment({x:n.x+n.points![i-1].x,y:n.y+n.points![i-1].y},{x:n.x+n.points![i].x,y:n.y+n.points![i].y},n.stroke,n.strokeWidth,n.dashed);return;}
-    const common={color:fill,borderColor:border,borderWidth:border?n.strokeWidth*scale:0,opacity:n.opacity??1,...(n.dashed?{borderDashArray:[7*scale,5*scale]}:{})};
+    const common={color:fill,borderColor:n.strokeWidth>0?border:undefined,borderWidth:border?n.strokeWidth*scale:0,
+     opacity:n.opacity??1,borderOpacity:n.opacity??1,...(n.dashed?{borderDashArray:[8*scale,5*scale]}:{})};
     if(n.kind==='ellipse')page.drawEllipse({x:x(n.x+n.w/2),y:y(n.y+n.h/2),xScale:w/2,yScale:h/2,...common});
-    else if(n.kind==='diamond')page.drawSvgPath(`M ${w/2} 0 L ${w} ${h/2} L ${w/2} ${h} L 0 ${h/2} Z`,{x:x(n.x),y:y(n.y),...common});
-    else if(n.kind==='round'||n.kind==='frame'){const r=Math.min((n.kind==='round'?15:8)*scale,w/2,h/2);page.drawSvgPath(`M ${r} 0 H ${w-r} Q ${w} 0 ${w} ${r} V ${h-r} Q ${w} ${h} ${w-r} ${h} H ${r} Q 0 ${h} 0 ${h-r} V ${r} Q 0 0 ${r} 0 Z`,{x:x(n.x),y:y(n.y),...common});}
-    else if(n.kind!=='text')page.drawRectangle({x:x(n.x),y:y(n.y+n.h),width:w,height:h,...common});
+    else if(n.kind==='diamond')page.drawSvgPath(diamondPath(0,0,n.w,n.h),{
+     ...common,x:x(n.x),y:y(n.y),scale,borderWidth:border?n.strokeWidth:0,borderDashArray:n.dashed?[8,5]:undefined,
+    });
+    else if(n.kind!=='text')page.drawSvgPath(roundRectPath(0,0,w,h,shapeRadius(n)*scale),{x:x(n.x),y:y(n.y),...common});
     if(n.kind==='image'){
      const key=JSON.stringify([n.assetId,n.crop,n.rotation,n.w/n.h]);let img=imageCache.get(key);
      if(!img){const data=await imageData(board,n);if(data){img=/^data:image\/jpeg/.test(data)?await pdf.embedJpg(data):await pdf.embedPng(data);imageCache.set(key,img);}}
@@ -158,16 +177,26 @@ export async function createVectorPDF(doc:FlowDocument,fontBytes:Uint8Array,opti
    };
    for(const n of board.nodes.filter(n=>n.kind==='frame'))await paintNode(n);
    for(const e of board.edges){
-    const ps=paths.get(e.id)!;if(ps.length<2){warnings.add('경로를 찾지 못한 연결선이 있습니다. 보드에서 경로를 조절하세요.');continue;}
-    for(let i=1;i<ps.length;i++)segment(ps[i-1],ps[i],e.color,e.width,e.dashed);
-    if(e.arrow!=='none')arrow(ps.at(-1)!,ps.at(-2)!,e.color,e.width);if(e.arrow==='both')arrow(ps[0],ps[1],e.color,e.width);
+    const ps=visualEdgePoints(paths.get(e.id)!,e,index);if(ps.length<2){warnings.add('경로를 찾지 못한 연결선이 있습니다. 보드에서 경로를 조절하세요.');continue;}
+    if(ps.some((p,i)=>i>0&&visible({x:Math.min(p.x,ps[i-1].x)-e.width,y:Math.min(p.y,ps[i-1].y)-e.width,
+     w:Math.abs(p.x-ps[i-1].x)+2*e.width,h:Math.abs(p.y-ps[i-1].y)+2*e.width}))){
+     const {start,end}=edgeArrows(ps,e);
+     const path=edgeSvgPath(ps,start?.[2]??ps[0],end?.[2]??ps[ps.length-1],e.style==='elbow');
+     const position={x:x(0),y:y(0),scale};
+     page.drawSvgPath(path,{...position,borderColor:lib.rgb(1,1,1),borderWidth:e.width+4});
+     page.drawSvgPath(path,{...position,borderColor:color(e.color),borderWidth:e.width,
+      borderLineCap:start||end?lib.LineCapStyle.Butt:lib.LineCapStyle.Round,...(e.dashed?{borderDashArray:[7,5]}:{})});
+     for(const vertices of [end,start])if(vertices)page.drawSvgPath('M'+vertices.map(p=>`${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(' L')+' Z',{...position,color:color(e.color)});
+    }
     const label=labels.get(e.id);if(label){
      for(let j=1;j<label.leader.length;j++)segment(label.leader[j-1],label.leader[j],e.color,.7,true);
      if(!visible(label.box))continue;
      const angle=-label.angle*Math.PI/180,c=Math.cos(angle),s=Math.sin(angle);
      page.pushOperators(lib.pushGraphicsState(),lib.concatTransformationMatrix(c,s,-s,c,x(label.center.x),y(label.center.y)));
-     page.drawRectangle({x:-label.textWidth*scale/2,y:-label.textHeight*scale/2,width:label.textWidth*scale,height:label.textHeight*scale,color:color(e.labelBackground??'#FFFFFF')});
-     const size=12*scale;label.lines.forEach((line,i)=>page.drawText(line,{x:-font.widthOfTextAtSize(line,size)/2,y:(label.textHeight/2-12-i*16)*scale-size*.35,font,size,color:color(e.color)}));
+     const labelW=label.textWidth*scale,labelH=label.textHeight*scale;
+     page.drawSvgPath(roundRectPath(0,0,labelW,labelH,labelH/2),{x:-labelW/2,y:labelH/2,
+      color:e.labelBackground==='transparent'?undefined:color(e.labelBackground??'#FFFFFF'),borderColor:color(e.color),borderOpacity:.25,borderWidth:scale});
+     const size=EDGE_LABEL_SIZE*scale;label.lines.forEach((line,i)=>page.drawText(line,{x:-font.widthOfTextAtSize(line,size)/2,y:((label.lines.length-1)/2-i)*EDGE_LABEL_LINE*scale-size*.35,font,size,color:color(e.color)}));
      page.pushOperators(lib.popGraphicsState());
     }
    }

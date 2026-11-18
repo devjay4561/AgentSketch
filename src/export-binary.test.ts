@@ -143,7 +143,13 @@ test('PDF and editable PPTX preserve the edge label background and right-angle o
  const fills=[...stream.matchAll(/^([\d.]+) ([\d.]+) ([\d.]+) rg$/gm)].map(match=>match.slice(1).map(Number));
  assert.ok(fills.some(([r,g,b])=>r===1&&g===0xF0/255&&b===0xE5/255));
  const pptx=await createPowerPoint(doc),zip=await JSZip.loadAsync(pptx.base64,{base64:true}),xml=await zip.file('ppt/slides/slide1.xml')!.async('text');
- const shape=xml.match(/<p:sp>[\s\S]*?<\/p:sp>/g)!.find(value=>value.includes('확인 후 진행'));assert.ok(shape);
- assert.match(shape,/rot="5400000"/);assert.match(shape,/<a:srgbClr val="FFF0E5"\/>/);
+ const shapes=xml.match(/<p:sp>[\s\S]*?<\/p:sp>/g)!;
+ const label=shapes.findIndex(value=>value.includes('확인 후 진행'));
+ assert.ok(label>0);
+ assert.match(shapes[label],/rot="5400000"/);
+ assert.match(shapes[label-1],/rot="5400000"/);
+ assert.match(shapes[label-1],/prst="roundRect"/);
+ assert.match(shapes[label-1],/<a:srgbClr val="FFF0E5"\/>/);
+ assert.match(xml,/type="stealth"/);
 });
 test('viewer html keeps one script and escapes document text',()=>{const html=renderViewerHTML(fixture()).toLowerCase();assert.equal(html.split('<script').length-1,1);assert.ok(!html.includes('javascript:'));assert.ok(html.includes('&lt;script&gt;')||html.includes('&#60;script'));assert.ok(html.includes('<svg'));});

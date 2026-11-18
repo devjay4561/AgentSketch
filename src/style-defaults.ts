@@ -1,4 +1,7 @@
 import type { FlowEdge, FlowNode } from './types.ts';
+import { PALETTE } from './theme.ts';
+
+export const DEFAULT_CONNECTOR = {color:PALETTE.line, width:1.5};
 
 export interface StyleStorage {getItem(key:string):string|null;setItem(key:string,value:string):void;removeItem(key:string):void}
 export const STYLE_DEFAULTS_KEY='agentsketch.style-defaults.v1';

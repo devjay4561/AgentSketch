@@ -1,0 +1,8 @@
+.shape-swatches { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; margin-bottom: 10px; }
+.shape-swatches button { position: relative; display: grid; place-items: center; min-height: 28px; padding: 3px; border: 1px solid var(--swatch-stroke); border-radius: 6px; background: var(--swatch-fill); color: var(--swatch-ink); }
+.shape-swatches button:hover:enabled { border-color: currentColor; }
+.shape-swatches button:disabled:hover { background: var(--swatch-fill); }
+.shape-swatches button[aria-pressed="true"] { outline: 2px solid var(--focus); outline-offset: 1px; }
+.shape-swatches button[aria-pressed="true"]::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.shape-swatches button:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.shape-apply-board { width: 100%; }

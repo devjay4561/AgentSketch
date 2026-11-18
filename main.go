@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"embed"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,7 +15,6 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
-	win "golang.org/x/sys/windows"
 )
 
 //go:embed all:dist
@@ -99,35 +97,6 @@ func restartApp(path string) error {
 	return cmd.Process.Release()
 }
 
-func waitForRestartParent() (bool, error) {
-	value, set := os.LookupEnv(restartWaitPID)
-	if !set {
-		return false, nil
-	}
-	if err := os.Unsetenv(restartWaitPID); err != nil {
-		return false, err
-	}
-	pid, err := strconv.ParseUint(value, 10, 32)
-	if err != nil || pid == 0 || pid == uint64(os.Getpid()) {
-		return false, nil
-	}
-	parent, err := win.OpenProcess(win.SYNCHRONIZE, false, uint32(pid))
-	if errors.Is(err, win.ERROR_INVALID_PARAMETER) {
-		return true, nil // The parent already exited.
-	}
-	if err != nil {
-		return false, err
-	}
-	defer win.CloseHandle(parent)
-	event, err := win.WaitForSingleObject(parent, 10_000)
-	if err != nil {
-		return false, err
-	}
-	if event != win.WAIT_OBJECT_0 {
-		return false, errors.New("timed out waiting for the previous AgentSketch process")
-	}
-	return true, nil
-}
 
 // Pre-rename builds were called FlowPaper. Move their profile (recovery, library, WebView2 data)
 // once; skip silently if the new folder exists or an old instance holds it open.

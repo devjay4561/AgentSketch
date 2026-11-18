@@ -1,7 +1,7 @@
 import type { FlowDocument, FlowNode, Point, Port } from './types.ts';
 import { createNode, DOCUMENT_LIMITS, uid } from './model.ts';
 import { edgePoints, intersects } from './geometry.ts';
-import { PALETTE } from './theme.ts';
+import { DEFAULT_CONNECTOR } from './style-defaults.ts';
 import { editableNodeIds } from './organization.ts';
 
 const locked = (doc:FlowDocument,node:FlowNode) => !editableNodeIds(doc).has(node.id);
@@ -33,7 +33,7 @@ export function addNextStep(doc:FlowDocument,nodeId:string):string {
   reserve(doc,1,1);
   const node=stepFrom(source,source.x+source.w+120,source.y);sparePosition(doc,node);
   if(Math.abs(node.x)>DOCUMENT_LIMITS.coordinate||Math.abs(node.y)>DOCUMENT_LIMITS.coordinate)throw new Error('작업지 좌표 범위를 벗어납니다.');
-  doc.nodes.push(node);doc.edges.push({id:uid(),from:source.id,to:node.id,fromPort:'right',toPort:'left',label:'',color:PALETTE.line,width:2,style:'elbow',dashed:false,arrow:'end',relation:'required'});
+  doc.nodes.push(node);doc.edges.push({id:uid(),from:source.id,to:node.id,fromPort:'right',toPort:'left',label:'',...DEFAULT_CONNECTOR,style:'elbow',dashed:false,arrow:'end',relation:'required'});
   return node.id;
 }
 function midpoint(points:Point[]):Point {
