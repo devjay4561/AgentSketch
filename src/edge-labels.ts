@@ -1,7 +1,7 @@
 import type { Box, FlowDocument, Point } from './types.ts';
 import { bounds, intersects } from './geometry.ts';
 import { route } from './routing.ts';
-import { FONT_FAMILY } from './theme.ts';
+import { boardFont } from './theme.ts';
 
 export interface EdgeLabel {box:Box;anchor:Point;lines:string[];center:Point;leader:Point[];angle:-90|0|90;textWidth:number;textHeight:number}
 export function pointAlong(points:Point[],position=.5):Point {
@@ -13,7 +13,7 @@ export function pointAlong(points:Point[],position=.5):Point {
 }
 export const EDGE_LABEL_SIZE = 13;
 export const EDGE_LABEL_LINE = 17;
-export const EDGE_LABEL_FONT = `500 ${EDGE_LABEL_SIZE}px ${FONT_FAMILY}`;
+export const edgeLabelFont = () => `500 ${EDGE_LABEL_SIZE}px ${boardFont()}`;
 export const estimateLabelWidth=(text:string)=>[...text].reduce((sum,c)=>sum+(c.charCodeAt(0)>255?13:7.15),0);
 const labelCache=new WeakMap<FlowDocument,{signature:string;labels:Map<string,EdgeLabel>}>();
 /** Shared canvas/SVG layout; labels avoid shapes and already placed captions. */

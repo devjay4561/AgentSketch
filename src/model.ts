@@ -203,7 +203,8 @@ export function validateDocument(input: unknown): FlowDocument {
   if(edges.some(e=>e.condition&&!nodeIds.has(e.condition.nodeId)))throw new Error('연결 조건이 존재하지 않는 요소를 참조합니다.');
   const workspace=raw.workspace!==undefined?validateWorkspace(raw.workspace,nodes):undefined;
   if(!workspace&&nodes.some(n=>n.details?.attachmentIds?.length))throw new Error('요소가 참조하는 첨부 파일이 문서에 없습니다.');
-  return { ...(workspace?{workspace}:{}), format: 'agentsketch', version: 1, title: str(raw.title ?? t('이름 없는 보드'), '보드 이름', 300), nodes, edges, assets, viewport: { x: finite(viewport.x, '보기 가로 위치', -10_000_000, 10_000_000), y: finite(viewport.y, '보기 세로 위치', -10_000_000, 10_000_000), zoom: finite(viewport.zoom, '보기 배율', .05, 8) } };
+  const font=raw.font===undefined||raw.font==='pretendard'?undefined:oneOf(raw.font,['suit','nanum-square-neo','ibm-plex-kr','maru-buri'] as const,'보드 글꼴');
+  return { ...(workspace?{workspace}:{}), ...(font?{font}:{}), format: 'agentsketch', version: 1, title: str(raw.title ?? t('이름 없는 보드'), '보드 이름', 300), nodes, edges, assets, viewport: { x: finite(viewport.x, '보기 가로 위치', -10_000_000, 10_000_000), y: finite(viewport.y, '보기 세로 위치', -10_000_000, 10_000_000), zoom: finite(viewport.zoom, '보기 배율', .05, 8) } };
 }
 
 function selected(doc: FlowDocument, ids: Iterable<string>): FlowNode[] {

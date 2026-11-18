@@ -24,6 +24,8 @@
 
 [Pretendard](https://github.com/orioncactus/pretendard) v1.3.9의 원본 Variable WOFF2를 `public/fonts`에 포함한다. 외부 CDN 요청 없이 UI·Canvas·텍스트 편집·PNG/PDF 내보내기에서 사용한다. 첫 Canvas 완성 렌더 전에 폰트를 불러온다. SVG는 Pretendard 우선 글꼴 목록을 기록하며, 앱 밖에서 여는 PC에 해당 글꼴이 없으면 시스템 대체 글꼴이 표시될 수 있다. SIL OFL 원문을 소스와 배포 고지에 포함한다.
 
+보드 글꼴은 파일 메뉴에서 보드마다 고른다(`FlowDocument.font`). SUIT·나눔스퀘어 네오·IBM Plex Sans KR·마루 부리의 원본 TTF(OFL)를 `public/fonts`에 포함해 캔버스 그리기와 PDF 내장에 같은 파일을 쓴다. 앱 UI는 Pretendard를 유지한다.
+
 ## 바뀐 화면
 
 | Before | After | Why |

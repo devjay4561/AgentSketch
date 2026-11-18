@@ -43,6 +43,8 @@ export interface FlowDocument {
   nodes: FlowNode[]; edges: FlowEdge[]; assets: Record<string, Asset>;
   viewport: { x: number; y: number; zoom: number };
   workspace?: WorkspaceData;
+  /** Board font id from src/fonts.ts; absent means Pretendard. */
+  font?: 'suit' | 'nanum-square-neo' | 'ibm-plex-kr' | 'maru-buri' | 'pretendard';
 }
 export type Tool = 'select' | 'hand' | 'connect' | ShapeKind;
 export interface RenderState {

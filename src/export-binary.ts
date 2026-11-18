@@ -6,6 +6,7 @@ import {diamondPath,edgeArrows,edgeSvgPath,roundRectPath,shapeRadius,textBox,vis
 import {planPages,MAX_PDF_PAGES} from './pdf-pagination.ts';
 import type {PdfPrintOptions} from './pdf-pagination.ts';
 import {t} from './i18n.ts';
+import {BOARD_FONTS,boardFontId,pdfFontUrls} from './fonts.ts';
 
 export interface ExportOptions extends PdfPrintOptions { boldFontBytes?:Uint8Array; scope?:'all'|'selection'; selection?:Set<string>; pages?:boolean; includeInternalNotes?:boolean; }
 export function exportDocuments(doc:FlowDocument,options:ExportOptions={}) {
@@ -70,11 +71,12 @@ async function imageData(doc:FlowDocument,node:FlowNode):Promise<string|undefine
  const out=canvas.toDataURL('image/png');canvas.width=canvas.height=1;image.src='';return out;
 }
 export async function createPowerPoint(doc:FlowDocument,options:ExportOptions={}):Promise<{base64:string;warnings:string[]}>{
+ const office=BOARD_FONTS[boardFontId(doc)].office;
  const {default:PptxGenJS}=await import('pptxgenjs');const pptx=new PptxGenJS();pptx.layout='LAYOUT_WIDE';pptx.author='AgentSketch';pptx.subject=t('편집 가능한 업무 흐름');pptx.title=doc.title;
- const warnings=new Set<string>(['PowerPoint에서 Pretendard가 설치되지 않은 경우 대체 글꼴로 표시됩니다.','연결선은 편집 가능한 선 조각이며 PowerPoint 도형에 자동으로 붙어 움직이지 않습니다.']);
+ const warnings=new Set<string>([t('PowerPoint에서 {0} 글꼴이 설치되지 않은 경우 대체 글꼴로 표시됩니다.',office),'연결선은 편집 가능한 선 조각이며 PowerPoint 도형에 자동으로 붙어 움직이지 않습니다.']);
  for(const board of exportDocuments(doc,options)){
   const slide=pptx.addSlide(),b=exportBounds(board),scale=Math.min(12.6/b.w,6.5/b.h),ox=.36-b.x*scale,oy=.7-b.y*scale;
-  slide.addText(board.title,{x:.36,y:.18,w:12.6,h:.3,fontFace:'Pretendard',fontSize:14,bold:true,color:'1C2024',margin:0});
+  slide.addText(board.title,{x:.36,y:.18,w:12.6,h:.3,fontFace:office,fontSize:14,bold:true,color:'1C2024',margin:0});
   const pos=(n:{x:number;y:number;w:number;h:number})=>({x:ox+n.x*scale,y:oy+n.y*scale,w:n.w*scale,h:n.h*scale});
   const index=new Map(board.nodes.map(n=>[n.id,n]));prepareRoutes(board,index);const paths=new Map(board.edges.map(e=>[e.id,edgePoints(e,board,index)])),labels=layoutEdgeLabels(board,paths);
   const segment=(a:Point,z:Point,color:string,width:number,arrow?:'end'|'start'|'both',dash=false)=>slide.addShape(pptx.ShapeType.line,{
@@ -89,8 +91,8 @@ export async function createPowerPoint(doc:FlowDocument,options:ExportOptions={}
     ...p,rectRadius:shapeRadius(n)*scale,fill:{color:hex(n.fill),transparency:n.fill==='transparent'?100:Math.round((1-(n.opacity??1))*100)},line,
    });
    if(n.kind==='image'){const data=await imageData(board,n);if(data)slide.addImage({...p,data});}
-   if(n.contentMode==='table'&&n.table){const rows=[n.table.columns,...n.table.rows],tp=pos(textBox(n)),titleH=n.text?Math.min(tp.h*.2,n.fontSize*scale*1.6):0;if(n.text)slide.addText(n.text,{x:tp.x,y:tp.y,w:tp.w,h:titleH,fontFace:'Pretendard',fontSize:Math.max(1,n.fontSize*scale*72),bold:true,color:hex(n.color),margin:0,fit:'shrink'});slide.addTable(rows.map((row,i)=>row.map(text=>({text,options:{bold:i===0,fill:{color:i===0?'FFF0E5':'FFFFFF'}}}))),{...tp,y:tp.y+titleH,h:tp.h-titleH,fontFace:'Pretendard',fontSize:Math.max(1,Math.min(n.fontSize*scale*72,(tp.h-titleH)/rows.length*50)),color:hex(n.color),rowH:(tp.h-titleH)/rows.length,colW:tp.w/n.table.columns.length,margin:2,border:{type:'solid',pt:.5,color:hex(n.stroke)},autoPage:false});}
-   else if(nodeExportText(n)&&n.kind!=='draw')slide.addText((n.textRuns??cardTextRuns(n))&&n.contentMode!=='table'&&n.contentMode!=='checklist'?(n.textRuns??cardTextRuns(n))!.map(run=>({text:run.text,options:{bold:run.bold??n.bold,color:hex(run.color??n.color,'1C2024'),fontSize:Math.max(1,(run.fontSize??n.fontSize)*scale*72),...(run.href?{hyperlink:{url:run.href}}:{})}})):nodeExportText(n),{...p,margin:Math.min(.08,p.w*.05),fontFace:'Pretendard',fontSize:Math.max(1,n.fontSize*scale*72),color:hex(n.color,'1C2024'),bold:n.bold,align:n.align,valign:n.kind==='text'||n.kind==='note'||n.kind==='frame'?'top':'middle',breakLine:false,fit:'shrink'});
+   if(n.contentMode==='table'&&n.table){const rows=[n.table.columns,...n.table.rows],tp=pos(textBox(n)),titleH=n.text?Math.min(tp.h*.2,n.fontSize*scale*1.6):0;if(n.text)slide.addText(n.text,{x:tp.x,y:tp.y,w:tp.w,h:titleH,fontFace:office,fontSize:Math.max(1,n.fontSize*scale*72),bold:true,color:hex(n.color),margin:0,fit:'shrink'});slide.addTable(rows.map((row,i)=>row.map(text=>({text,options:{bold:i===0,fill:{color:i===0?'FFF0E5':'FFFFFF'}}}))),{...tp,y:tp.y+titleH,h:tp.h-titleH,fontFace:office,fontSize:Math.max(1,Math.min(n.fontSize*scale*72,(tp.h-titleH)/rows.length*50)),color:hex(n.color),rowH:(tp.h-titleH)/rows.length,colW:tp.w/n.table.columns.length,margin:2,border:{type:'solid',pt:.5,color:hex(n.stroke)},autoPage:false});}
+   else if(nodeExportText(n)&&n.kind!=='draw')slide.addText((n.textRuns??cardTextRuns(n))&&n.contentMode!=='table'&&n.contentMode!=='checklist'?(n.textRuns??cardTextRuns(n))!.map(run=>({text:run.text,options:{bold:run.bold??n.bold,color:hex(run.color??n.color,'1C2024'),fontSize:Math.max(1,(run.fontSize??n.fontSize)*scale*72),...(run.href?{hyperlink:{url:run.href}}:{})}})):nodeExportText(n),{...p,margin:Math.min(.08,p.w*.05),fontFace:office,fontSize:Math.max(1,n.fontSize*scale*72),color:hex(n.color,'1C2024'),bold:n.bold,align:n.align,valign:n.kind==='text'||n.kind==='note'||n.kind==='frame'?'top':'middle',breakLine:false,fit:'shrink'});
   };
   for(const n of board.nodes.filter(n=>n.kind==='frame'))await paintNode(n);
   for(const e of board.edges){
@@ -103,7 +105,7 @@ export async function createPowerPoint(doc:FlowDocument,options:ExportOptions={}
     const p=pos({x:label.center.x-label.textWidth/2,y:label.center.y-label.textHeight/2,w:label.textWidth,h:label.textHeight});
     slide.addShape(pptx.ShapeType.roundRect,{...p,rotate:label.angle,rectRadius:Math.min(p.w,p.h)/2,
      line:{color:hex(e.color),width:scale*72,transparency:75},fill:{color:hex(e.labelBackground??'#FFFFFF'),transparency:e.labelBackground==='transparent'?100:0}});
-    slide.addText(label.lines.join('\n'),{...p,rotate:label.angle,fontFace:'Pretendard Medium',fontSize:EDGE_LABEL_SIZE*scale*72,align:'center',valign:'middle',color:hex(e.color),margin:0,fit:'shrink'});
+    slide.addText(label.lines.join('\n'),{...p,rotate:label.angle,fontFace:office,fontSize:EDGE_LABEL_SIZE*scale*72,align:'center',valign:'middle',color:hex(e.color),margin:0,fit:'shrink'});
    }
   }
   for(const n of board.nodes.filter(n=>n.kind!=='frame'))await paintNode(n);
@@ -123,7 +125,7 @@ export async function createVectorPDF(doc:FlowDocument,fontBytes:Uint8Array,opti
  const font=await pdf.embedFont(fontBytes,{subset:false});
  const needsBold=boards.some(board=>board.nodes.some(n=>n.bold||n.contentMode==='table'||n.contentMode==='checklist'&&!!n.text||n.textRuns?.some(run=>run.bold)||!!cardTextRuns(n)));
  let boldBytes=options.boldFontBytes;
- if(needsBold&&!boldBytes&&typeof window!=='undefined'){const response=await fetch('/fonts/AgentSketchExport-Semibold.ttf');if(!response.ok)throw new Error('굵은 PDF 글꼴을 불러오지 못했습니다.');boldBytes=new Uint8Array(await response.arrayBuffer());}
+ if(needsBold&&!boldBytes&&typeof window!=='undefined'){const response=await fetch(pdfFontUrls(doc)[1]);if(!response.ok)throw new Error('굵은 PDF 글꼴을 불러오지 못했습니다.');boldBytes=new Uint8Array(await response.arrayBuffer());}
  if(needsBold&&!boldBytes)throw new Error('굵은 본문이 있는 PDF에는 boldFontBytes 글꼴이 필요합니다.');
  const boldFont=needsBold?await pdf.embedFont(boldBytes!,{subset:false}):font;
  const imageCache=new Map<string,Awaited<ReturnType<typeof pdf.embedPng>>>(),warnings=new Set<string>();

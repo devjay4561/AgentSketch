@@ -22,6 +22,8 @@ const modules=execFileSync('go',['list','-m','-f','{{.Path}}|{{.Version}}|{{.Dir
 const notices=['AgentSketch third-party notices\n\nAll original notices and license terms below apply to their respective dependencies.\n'];
 notices.push('\nAgentSketch Export Sans Regular and Semibold: derived static PDF fonts (AgentSketchExport-Regular.ttf, AgentSketchExport-Semibold.ttf), renamed from Pretendard to respect the Reserved Font Name. Licensed under SIL Open Font License 1.1. See original OFL below.\n');
 notices.push('\nPretendard Variable v1.3.9\nhttps://github.com/orioncactus/pretendard\n\n' + await fs.readFile(path.join(root,'public/fonts/OFL.txt'),'utf8'));
+for (const [name,file] of [['SUIT v2.0.5 (https://github.com/sun-typeface/SUIT)','OFL-SUIT.txt'],['NanumSquare Neo (https://campaign.naver.com/nanumsquare_neo/)','OFL-NanumSquareNeo.txt'],['IBM Plex Sans KR 1.1.0 (https://github.com/IBM/plex)','OFL-IBMPlexSansKR.txt'],['MaruBuri (https://hangeul.naver.com/fonts)','OFL-MaruBuri.txt']])
+  notices.push(`\n${name}\n\n` + await fs.readFile(path.join(root,'public/fonts',file),'utf8'));
 for(const line of modules){
   const [name,version,dir]=line.split('|');if(name==='agentsketch'||!dir)continue;
   const entries=await fs.readdir(dir).catch(()=>[]);

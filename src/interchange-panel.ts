@@ -5,6 +5,7 @@ import { cloneDocument, validateDocument } from './model.ts';
 import { importCSV, exportCSV, importDrawio, exportDrawio } from './interchange.ts';
 import { renderEvidenceReport } from './report-export.ts';
 import { renderSVG } from './renderer.ts';
+import { pdfFontUrls } from './fonts.ts';
 import { exportDocuments, exportExchangeDocument, pdfPageCount } from './export-binary.ts';
 import './interchange.css';
 
@@ -39,7 +40,7 @@ export function mountInterchangePanel(host:WorkbenchHost,container:HTMLElement){
   try{
    const doc=cloneDocument(host.getDocument()),opts=options(),boards=exportDocuments(doc,opts);let content='',binary=false,warnings:string[]=[];
    if(kind==='pptx'){const {createPowerPoint}=await import('./export-binary.ts');const out=await createPowerPoint(doc,opts);content=out.base64;binary=true;warnings=out.warnings;}
-   else if(kind==='pdf-vector'){const {createVectorPDF}=await import('./export-binary.ts');const response=await fetch('/fonts/AgentSketchExport-Regular.ttf');if(!response.ok)throw new Error('PDF 글꼴을 불러오지 못했습니다.');const out=await createVectorPDF(doc,new Uint8Array(await response.arrayBuffer()),opts);content=base64(out.bytes);binary=true;warnings=out.warnings;}
+   else if(kind==='pdf-vector'){const {createVectorPDF}=await import('./export-binary.ts');const [regularUrl]=pdfFontUrls(doc);const response=await fetch(regularUrl);if(!response.ok)throw new Error('PDF 글꼴을 불러오지 못했습니다.');const out=await createVectorPDF(doc,new Uint8Array(await response.arrayBuffer()),opts);content=base64(out.bytes);binary=true;warnings=out.warnings;}
    else if(kind==='html')content=renderEvidenceReport(doc,opts);
    else {const editable=['csv','drawio','agentsketch'].includes(kind),exchange=editable?exportExchangeDocument(doc,opts):undefined,flat=exchange?validateDocument(exchange.document):opts.scope==='selection'?boards[0]:doc;if(exchange)warnings.push(...exchange.warnings);
     if(kind==='csv')content=exportCSV(flat);

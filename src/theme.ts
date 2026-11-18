@@ -1,6 +1,11 @@
 /** Shared canvas/editor typography and application chrome, not document migration. */
 export const FONT_FAMILY = '"Pretendard Variable", Pretendard, "Segoe UI", "Malgun Gothic", sans-serif';
 
+// Canvas and export text use the current board's font (src/fonts.ts sets it before drawing).
+let boardFamily = FONT_FAMILY;
+export function boardFont(): string { return boardFamily; }
+export function setBoardFontFamily(family: string): void { boardFamily = family; }
+
 export const PALETTE = {
   accent: '#F76B15',
   accentText: '#C2410C',

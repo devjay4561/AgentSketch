@@ -1,3 +1,4 @@
+import {pdfFontUrls} from './fonts.ts';
 import {validateDocument} from './model.ts';
 import {renderPNG,renderSVG} from './renderer.ts';
 import {exportCSV,exportDrawio,importCSV,importDrawio} from './interchange.ts';
@@ -15,7 +16,7 @@ export async function renderAutomation(request:any):Promise<any>{
  const format=request.format,flat=exportDocuments(doc,{...options,pages:false})[0];
  if(format==='png')return {data:(await renderPNG(flat,request.scale??1)).split(',')[1],encoding:'base64',mime:'image/png',warnings:[]};
  if(format==='svg')return {data:renderSVG(flat),encoding:'utf8',mime:'image/svg+xml',warnings:[]};
- if(format==='pdf'){const font=new Uint8Array(await (await fetch('/fonts/AgentSketchExport-Regular.ttf')).arrayBuffer());const out=await createVectorPDF(doc,font,options);return {data:base64(out.bytes),encoding:'base64',mime:'application/pdf',warnings:out.warnings};}
+ if(format==='pdf'){const [regular]=pdfFontUrls(doc);const font=new Uint8Array(await (await fetch(regular)).arrayBuffer());const out=await createVectorPDF(doc,font,options);return {data:base64(out.bytes),encoding:'base64',mime:'application/pdf',warnings:out.warnings};}
  if(format==='pptx'){const out=await createPowerPoint(doc,options);return {data:out.base64,encoding:'base64',mime:'application/vnd.openxmlformats-officedocument.presentationml.presentation',warnings:out.warnings};}
  if(format==='html')return {data:renderEvidenceReport(flat,options),encoding:'utf8',mime:'text/html',warnings:[]};
  const exchange=exportExchangeDocument(doc,options),valid=validateDocument(exchange.document);

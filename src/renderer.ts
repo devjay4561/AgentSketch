@@ -1,12 +1,12 @@
 import type { Asset, Box, FlowDocument, FlowEdge, FlowNode, Point, RenderState } from './types.ts';
 import { bounds, edgePoints, portPoint, prepareRoutes, routeHandles } from './geometry.ts';
-import { FONT_FAMILY, PALETTE } from './theme.ts';
+import { PALETTE, boardFont } from './theme.ts';
+import { loadBoardFont, boardFontId, useBoardFont } from './fonts.ts';
 import { renderRichContent, svgRichContent, WRAP_TOKENS } from './rich-render.ts';
-import { EDGE_LABEL_FONT, EDGE_LABEL_LINE, EDGE_LABEL_SIZE, layoutEdgeLabels, type EdgeLabel } from './edge-labels.ts';
+import { edgeLabelFont, EDGE_LABEL_LINE, EDGE_LABEL_SIZE, layoutEdgeLabels, type EdgeLabel } from './edge-labels.ts';
 import { graphicsProfile } from './graphics.ts';
 import { t } from './i18n.ts';
 
-const FONT = FONT_FAMILY;
 const PAPER = PALETTE.paper;
 const ACCENT = PALETTE.accent;
 const REMOTE = '#2F6FED';
@@ -161,14 +161,14 @@ function pathNode(ctx: CanvasRenderingContext2D, node: FlowNode, simplified = fa
 
 function drawText(ctx: CanvasRenderingContext2D, node: FlowNode, fit: boolean): void {
   const box = fit ? exportTextBox(node) : textBox(node);
-  if (renderRichContent(ctx,node,box,FONT,fit)) return;
+  if (renderRichContent(ctx,node,box,boardFont(),fit)) return;
   if (!node.text) return;
   if (!fit && (box.w < 4 || box.h < 4)) return;
   let fontSize = node.kind === 'frame' ? Math.min(18, node.fontSize) : node.fontSize;
   const weight = node.bold ? 600 : 500;
   ctx.save();
   ctx.beginPath(); ctx.rect(box.x, box.y, box.w, box.h); ctx.clip();
-  ctx.font = `${weight} ${fontSize}px ${FONT}`;
+  ctx.font = `${weight} ${fontSize}px ${boardFont()}`;
   ctx.fillStyle = node.color;
   ctx.textBaseline = 'alphabetic';
   ctx.fontKerning = 'normal';
@@ -178,7 +178,7 @@ function drawText(ctx: CanvasRenderingContext2D, node: FlowNode, fit: boolean): 
   const lines = lineSegments(node.text, box.w, measure);
   if (fit) {
     fontSize *= plainTextScale(lines,box,fontSize,measure);
-    ctx.font = `${weight} ${fontSize}px ${FONT}`;
+    ctx.font = `${weight} ${fontSize}px ${boardFont()}`;
   }
   const lh = fontSize * 1.45;
   const top = node.kind === 'note' || node.kind === 'text' || node.kind === 'frame';
@@ -263,7 +263,7 @@ function drawNode(ctx: CanvasRenderingContext2D, node: FlowNode, bitmap?: Bitmap
       ctx.strokeStyle = '#98A3B2'; ctx.lineWidth = 1.5; ctx.setLineDash([]);
       ctx.strokeRect(cx - 18, cy - 24, 36, 30);
       ctx.beginPath(); ctx.moveTo(cx - 15, cy + 2); ctx.lineTo(cx - 4, cy - 9); ctx.lineTo(cx + 4, cy - 2); ctx.lineTo(cx + 10, cy - 8); ctx.lineTo(cx + 16, cy + 2); ctx.stroke();
-      ctx.fillStyle = PALETTE.muted; ctx.font = `12px ${FONT}`; ctx.textAlign = 'center';
+      ctx.fillStyle = PALETTE.muted; ctx.font = `12px ${boardFont()}`; ctx.textAlign = 'center';
       if (textVisible) ctx.fillText(imageFailed ? t('이미지를 읽을 수 없습니다') : t('이미지'), cx, cy + 27, node.w - 12);
     }
     ctx.restore();
@@ -359,7 +359,7 @@ function drawEdge(ctx: CanvasRenderingContext2D, edge: FlowEdge, points: Point[]
     ctx.save();ctx.translate(center.x,center.y);ctx.rotate(angle*Math.PI/180);
     ctx.fillStyle=edge.labelBackground??'#fff';ctx.beginPath();ctx.roundRect(-textWidth/2,-textHeight/2,textWidth,textHeight,textHeight/2);ctx.fill();
     const alpha=ctx.globalAlpha;ctx.globalAlpha=alpha*.25;ctx.strokeStyle=edge.color;ctx.lineWidth=1;ctx.stroke();ctx.globalAlpha=alpha;
-    ctx.fillStyle=edge.color;ctx.font=EDGE_LABEL_FONT;ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=edge.color;ctx.font=edgeLabelFont();ctx.textAlign='center';ctx.textBaseline='middle';
     lines.forEach((line,i)=>ctx.fillText(line,0,(i-(lines.length-1)/2)*EDGE_LABEL_LINE));ctx.restore();
   }
   ctx.restore();
@@ -479,6 +479,7 @@ export class Renderer {
   render(state: RenderState): void {
     if (this.disposed) return;
     const { doc } = state, { x, y, zoom } = doc.viewport, ctx = this.ctx;
+    useBoardFont(doc, this.invalidate);
     const nodeIndex = new Map(doc.nodes.map(node => [node.id, node])); prepareRoutes(doc, nodeIndex);
     for (const [id, cached] of this.images) if (!doc.assets[id] || doc.assets[id].data !== cached.data) this.evict(id);
     ctx.setTransform(this.ratio, 0, 0, this.ratio, 0, 0);
@@ -527,7 +528,7 @@ export class Renderer {
     const paint = (node: FlowNode, bitmap?: Bitmap, failed = false) => { ctx.save(); ctx.globalAlpha = nodeAlpha(node); drawNode(ctx, node, bitmap, failed, textShown(node), effects(node), pixelScale, false, simplified); ctx.restore(); };
     for (const node of visibleNodes) if (node.kind === 'frame') paint(node);
     const paths=new Map(doc.edges.map(e=>[e.id,edgePoints(e,doc,nodeIndex)]));
-    ctx.font=EDGE_LABEL_FONT;const labels=layoutEdgeLabels(doc,paths,t=>ctx.measureText(t).width);
+    ctx.font=edgeLabelFont();const labels=layoutEdgeLabels(doc,paths,t=>ctx.measureText(t).width);
     this.blockedEdges = [];
     const emphasized: Array<[FlowEdge, Point[], EdgeLabel | undefined]> = [];
     for (const edge of doc.edges) {
@@ -572,7 +573,7 @@ export class Renderer {
       // Recent edits from an external agent: outline plus a name tag, like a co-editor in a shared document.
       ctx.save(); ctx.strokeStyle = REMOTE; ctx.lineWidth = 2.5 / zoom; ctx.setLineDash([]);
       for (const edge of doc.edges) { const points = state.remote.has(edge.id) ? paths.get(edge.id) : undefined; if (points?.length) { ctx.beginPath(); points.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.stroke(); } }
-      ctx.font = `600 ${11 / zoom}px ${FONT}`; ctx.textBaseline = 'middle';
+      ctx.font = `600 ${11 / zoom}px ${boardFont()}`; ctx.textBaseline = 'middle';
       for (const node of visibleNodes) if (state.remote.has(node.id)) {
         const box = inflate(node, 5 / zoom), h = 16 / zoom, w = ctx.measureText('AI').width + 10 / zoom;
         ctx.strokeRect(box.x, box.y, box.w, box.h);
@@ -620,13 +621,14 @@ function documentBounds(doc: FlowDocument): Box {
     all.w = right - all.x; all.h = bottom - all.y;
   }
   const measure=typeof document!=='undefined'?document.createElement('canvas').getContext('2d'):null;
-  if(measure)measure.font=EDGE_LABEL_FONT;
+  if(measure)measure.font=edgeLabelFont();
   const labels=layoutEdgeLabels(doc,new Map(doc.edges.map(e=>[e.id,edgePoints(e,doc,nodeIndex)])),measure?t=>measure.measureText(t).width:undefined);
   for(const {box} of labels.values()){const right=Math.max(all.x+all.w,box.x+box.w),bottom=Math.max(all.y+all.h,box.y+box.h);all.x=Math.min(all.x,box.x);all.y=Math.min(all.y,box.y);all.w=right-all.x;all.h=bottom-all.y;}
   return inflate(all, PAD);
 }
 
 export async function renderPNG(doc: FlowDocument, scale = 2): Promise<string> {
+  await loadBoardFont(boardFontId(doc)).catch(() => {}); useBoardFont(doc);
   const box = documentBounds(doc);
   const safeScale = Math.max(Number.EPSILON, Math.min(scale, 8192 / Math.max(box.w, box.h), Math.sqrt(32_000_000 / (box.w * box.h))));
   const canvas = document.createElement('canvas');
@@ -637,7 +639,7 @@ export async function renderPNG(doc: FlowDocument, scale = 2): Promise<string> {
   ctx.scale(safeScale, safeScale); ctx.translate(-box.x, -box.y);
   const nodeIndex = new Map(doc.nodes.map(node => [node.id, node])); prepareRoutes(doc, nodeIndex);
   for (const node of doc.nodes) if (node.kind === 'frame') drawNode(ctx, { ...node, locked: false }, undefined, false, true, 'rich', safeScale, true);
-  ctx.font=EDGE_LABEL_FONT;
+  ctx.font=edgeLabelFont();
   const paths=new Map(doc.edges.map(e=>[e.id,edgePoints(e,doc,nodeIndex)]));
   const labels=layoutEdgeLabels(doc,paths,t=>ctx.measureText(t).width);
   for (const edge of doc.edges) drawEdge(ctx, edge, visualEdgePoints(paths.get(edge.id)!,edge,nodeIndex), false, 1, labels.get(edge.id), '#fff');
@@ -701,9 +703,9 @@ function svgShape(node: FlowNode, attrs: string): string {
 
 function svgText(node: FlowNode, measure?: CanvasRenderingContext2D | null): string {
   const box = exportTextBox(node), baseSize = node.kind === 'frame' ? Math.min(18, node.fontSize) : node.fontSize;
-  const rich=svgRichContent(node,box,FONT,measure,true);if(rich!==null)return rich;
+  const rich=svgRichContent(node,box,boardFont(),measure,true);if(rich!==null)return rich;
   if (!node.text) return '';
-  if (measure) measure.font = `${node.bold ? 600 : 500} ${baseSize}px ${FONT}`;
+  if (measure) measure.font = `${node.bold ? 600 : 500} ${baseSize}px ${boardFont()}`;
   const textWidth = (text: string) => measure?.measureText(text).width ?? [...text].reduce((sum,char) => sum+baseSize*(char.charCodeAt(0)>255?1:.55),0);
   const lines = lineSegments(node.text, box.w, textWidth);
   const fs = baseSize * plainTextScale(lines,box,baseSize,textWidth);
@@ -711,15 +713,16 @@ function svgText(node: FlowNode, measure?: CanvasRenderingContext2D | null): str
   const top = node.kind === 'note' || node.kind === 'text' || node.kind === 'frame';
   const start = box.y + (top ? lh / 2 : Math.max(lh / 2, (box.h - lines.length * lh) / 2 + lh / 2));
   const tx = box.x + (align === 'center' ? box.w / 2 : align === 'right' ? box.w : 0);
-  return `<text font-family="${escape(FONT)}" font-size="${fs}" font-weight="${node.bold ? 600 : 500}" text-anchor="${align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start'}" dominant-baseline="central" fill="${svgColor(node.color)}">${lines.map((line, i) => `<tspan x="${n(tx)}" y="${n(start + i * lh)}">${escape(line)}</tspan>`).join('')}</text>`;
+  return `<text font-family="${escape(boardFont())}" font-size="${fs}" font-weight="${node.bold ? 600 : 500}" text-anchor="${align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start'}" dominant-baseline="central" fill="${svgColor(node.color)}">${lines.map((line, i) => `<tspan x="${n(tx)}" y="${n(start + i * lh)}">${escape(line)}</tspan>`).join('')}</text>`;
 }
 
 export function renderSVG(doc: FlowDocument): string {
+  useBoardFont(doc);
   const box = documentBounds(doc), parts: string[] = [];
   const frameParts: string[] = [];
   const nodeIndex = new Map(doc.nodes.map(node => [node.id, node])); prepareRoutes(doc, nodeIndex);
   const measure = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
-  if(measure)measure.font=EDGE_LABEL_FONT;
+  if(measure)measure.font=edgeLabelFont();
   const paths=new Map(doc.edges.map(e=>[e.id,edgePoints(e,doc,nodeIndex)]));
   const labels=layoutEdgeLabels(doc,paths,measure?t=>measure.measureText(t).width:undefined);
   parts.push(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${n(box.x)} ${n(box.y)} ${n(box.w)} ${n(box.h)}" width="${n(box.w)}" height="${n(box.h)}" role="img"><title>${escape(doc.title)}</title><rect x="${n(box.x)}" y="${n(box.y)}" width="${n(box.w)}" height="${n(box.h)}" fill="white"/>`);
@@ -736,7 +739,7 @@ export function renderSVG(doc: FlowDocument): string {
     const label=labels.get(edge.id);
     if(label){const {center,lines,leader,angle,textWidth,textHeight}=label;
       if(leader.length)parts.push(`<polyline points="${leader.map(p=>`${n(p.x)},${n(p.y)}`).join(' ')}" fill="none" stroke="${svgColor(edge.color)}" stroke-width=".8"/>`);
-      parts.push(`<g transform="translate(${n(center.x)} ${n(center.y)}) rotate(${angle})"><rect x="${n(-textWidth/2)}" y="${n(-textHeight/2)}" width="${n(textWidth)}" height="${n(textHeight)}" rx="${n(textHeight/2)}" fill="${svgColor(edge.labelBackground??'#ffffff')}" stroke="${svgColor(edge.color)}" stroke-opacity=".25"/><text text-anchor="middle" dominant-baseline="central" font-family="${escape(FONT)}" font-size="${EDGE_LABEL_SIZE}" font-weight="500" fill="${svgColor(edge.color)}">${lines.map((line,i)=>`<tspan x="0" y="${n((i-(lines.length-1)/2)*EDGE_LABEL_LINE)}">${escape(line)}</tspan>`).join('')}</text></g>`);
+      parts.push(`<g transform="translate(${n(center.x)} ${n(center.y)}) rotate(${angle})"><rect x="${n(-textWidth/2)}" y="${n(-textHeight/2)}" width="${n(textWidth)}" height="${n(textHeight)}" rx="${n(textHeight/2)}" fill="${svgColor(edge.labelBackground??'#ffffff')}" stroke="${svgColor(edge.color)}" stroke-opacity=".25"/><text text-anchor="middle" dominant-baseline="central" font-family="${escape(boardFont())}" font-size="${EDGE_LABEL_SIZE}" font-weight="500" fill="${svgColor(edge.color)}">${lines.map((line,i)=>`<tspan x="0" y="${n((i-(lines.length-1)/2)*EDGE_LABEL_LINE)}">${escape(line)}</tspan>`).join('')}</text></g>`);
     }
   }
   for (const node of doc.nodes) {

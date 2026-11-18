@@ -9,6 +9,7 @@ import {projectVisibleDocument,editableNodeIds,groupMembers,topGroupId,DEFAULT_P
 import {applyNodeDefaults,applyEdgeDefaults,DEFAULT_CONNECTOR} from './style-defaults.ts';
 import { mountStylePresetsPanel } from './style-presets-panel.ts';
 import { tidyBoard } from './shape-themes.ts';
+import { BOARD_FONTS, BOARD_FONT_IDS, boardFontId, loadBoardFont, boardFontFamily, type BoardFontId } from './fonts.ts';
 import { setGraphicsProfile } from './graphics.ts';
 import {addNextStep,splitConnection} from './diagram-actions.ts';
 import {setNodePlainText} from './rich-text.ts';
@@ -21,7 +22,7 @@ import { createSample } from './sample.ts';
 import { Renderer, drawMinimap, textBox } from './renderer.ts';
 import { isNative, openDocument, saveDocument, autosave, loadAutosave, exportFile, importImages } from './persistence.ts';
 import { icon } from './icons.ts';
-import { FONT_FAMILY, PALETTE } from './theme.ts';
+import { FONT_FAMILY, PALETTE, boardFont } from './theme.ts';
 import { setupUIFeedback } from './ui-feedback.ts';
 import { installDomTranslation, lang, setLang, t } from './i18n.ts';
 
@@ -457,7 +458,7 @@ function positionEditor() {
   const luminance = ((rgb >> 16) * .299 + (rgb >> 8 & 255) * .587 + (rgb & 255) * .114) / 255;
   Object.assign(textEditor.style, {
     left: `${box.x * z + v.x}px`, top: `${box.y * z + v.y}px`, width: `${Math.max(40, box.w * z)}px`, height: `${Math.max(size * 1.45, box.h * z)}px`,
-    fontFamily: FONT_FAMILY, fontSize: `${size}px`, fontWeight: n.bold ? '600' : '500', lineHeight: '1.45',
+    fontFamily: boardFont(), fontSize: `${size}px`, fontWeight: n.bold ? '600' : '500', lineHeight: '1.45',
     textAlign: n.kind === 'frame' ? 'left' : n.align, color: n.color, caretColor: n.color, background: 'transparent', padding: '0',
   });
   textEditor.style.setProperty('--edit-selection', luminance > .6 ? 'rgba(255,255,255,.32)' : 'rgba(247,107,21,.22)');
@@ -480,6 +481,7 @@ textEditor.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preven
 
 function updateUI() {
   workbench?.update(); tabs?.update();
+  $<HTMLSelectElement>('board-font').value = boardFontId(doc);
   const title = $<HTMLInputElement>('document-title'); if (document.activeElement !== title) title.value = doc.title;
   $('node-count').textContent = `${doc.nodes.length}개 요소 · ${doc.edges.length}개 연결`;
   const nodes = selectedNodes(), edge = doc.edges.find(e => e.id === selectedEdge), n = nodes[0];
@@ -875,6 +877,16 @@ const updateStylePresets = mountStylePresetsPanel($('shape-presets'), {
     [{label:t('적용'),value:'apply'},{label:t('취소'),value:'cancel'}]) === 'apply',
   tidyBoard: () => void action('tidy-board'),
 });
+// Board font: one choice per board, saved in the file and used by every export.
+{
+  const select = $<HTMLSelectElement>('board-font');
+  for (const id of BOARD_FONT_IDS) { const option = document.createElement('option'); option.value = id; option.textContent = t(BOARD_FONTS[id].label); option.style.fontFamily = boardFontFamily(id); select.append(option); }
+  select.addEventListener('change', () => {
+    const id = select.value as BoardFontId; if (id === boardFontId(doc)) return;
+    void loadBoardFont(id).catch(() => toast('글꼴을 불러오지 못했습니다.', true));
+    mutate(() => { if (id === 'pretendard') delete doc.font; else doc.font = id; }, t('보드 글꼴을 {0}(으)로 바꿨습니다.', t(BOARD_FONTS[id].label)));
+  });
+}
 workbench=mountWorkbench(workbenchHost);
 void initialize();
 
