@@ -63,7 +63,7 @@ async function imageData(doc:FlowDocument,node:FlowNode):Promise<string|undefine
  if(!crop && !node.rotation && /^data:image\/(png|jpeg);base64,/.test(asset.data))return asset.data;
  if(typeof document==='undefined')throw new Error('WebP/GIF 또는 자른 이미지 내보내기는 앱에서 실행하세요.');
  const image=new Image();image.src=asset.data;await image.decode();const canvas=document.createElement('canvas');
- const region=crop??{x:0,y:0,w:1,h:1};const wantedW=image.naturalWidth*region.w,wantedH=wantedW*node.h/node.w,ratio=Math.min(1,2400/wantedW,2400/wantedH);canvas.width=Math.max(1,Math.round(wantedW*ratio));canvas.height=Math.max(1,Math.round(wantedH*ratio));
+ const region=crop??{x:0,y:0,w:1,h:1};const wantedW=image.naturalWidth*region.w,wantedH=wantedW*node.h/node.w,ratio=Math.min(1,4096/wantedW,4096/wantedH);canvas.width=Math.max(1,Math.round(wantedW*ratio));canvas.height=Math.max(1,Math.round(wantedH*ratio));
  const ctx=canvas.getContext('2d');if(!ctx)throw new Error('이미지 변환을 시작할 수 없습니다.');
  ctx.beginPath();ctx.roundRect(0,0,canvas.width,canvas.height,Math.min(8*canvas.width/node.w,canvas.width/2,canvas.height/2));ctx.clip();ctx.translate(canvas.width/2,canvas.height/2);ctx.rotate((node.rotation??0)*Math.PI/180);ctx.translate(-canvas.width/2,-canvas.height/2);
  ctx.drawImage(image,region.x*image.naturalWidth,region.y*image.naturalHeight,region.w*image.naturalWidth,region.h*image.naturalHeight,0,0,canvas.width,canvas.height);

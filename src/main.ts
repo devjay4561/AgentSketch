@@ -476,11 +476,15 @@ function deleteSelection() {
   mutate(() => { const ids = new Set(editableNodes().map(n => n.id)); removeSelection(doc, ids); if (selectedEdge) doc.edges = doc.edges.filter(e => e.id !== selectedEdge); selected.clear(); selectedEdge = null; }, locked ? '잠긴 요소는 보존했습니다. 잠금을 풀면 삭제할 수 있습니다.' : undefined);
 }
 function groupSelection() { if (editableNodes().length < 2) { toast('두 개 이상의 요소를 선택하세요.'); return; } mutate(() => { createGroup(doc,editableNodes().map(n=>n.id)); }, '요소를 묶었습니다. Ctrl+Shift+G로 풀 수 있습니다.'); }
-async function addImages(files: File[], at = center()) {
+async function addImages(files: File[], at?: Point) {
   if (!files.length) return;
   const targetDocument = doc;
   try {
-    const result = await importImages(files, at);
+    const result = await importImages(files, at ?? center(), {
+      maxWorld: { w: canvas.clientWidth / doc.viewport.zoom, h: canvas.clientHeight / doc.viewport.zoom },
+      pixelRatio: window.devicePixelRatio || 1,
+      centered: !at,
+    });
     if (doc !== targetDocument) { toast('보드가 바뀌어 이미지 추가를 취소했습니다. 현재 보드에 다시 추가하세요.'); return; }
     if (!result.nodes.length) return;
     const candidate = { ...doc, nodes: [...doc.nodes, ...result.nodes], assets: { ...doc.assets, ...result.assets } };

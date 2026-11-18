@@ -19,7 +19,7 @@ export const isNative = !!native();
 const MAX_DOCUMENT_BYTES = 80 * 1024 * 1024;
 const MAX_SOURCE_BYTES = 25 * 1024 * 1024;
 const MAX_IMAGE_PIXELS = 64 * 1024 * 1024;
-const MAX_IMAGE_SIDE = 2400;
+const MAX_IMAGE_SIDE = 3840;
 let recoveryQueue: Promise<void> = Promise.resolve();
 let database: Promise<IDBDatabase> | undefined;
 
@@ -299,7 +299,17 @@ function rasterHeader(bytes: Uint8Array): RasterHeader {
   throw new Error('PNG, JPG, WebP, GIF 이미지만 추가할 수 있습니다. PPT 화면은 그림으로 복사해 붙여넣으세요.');
 }
 
-export async function importImages(files: File[], at: Point): Promise<{ nodes: FlowNode[]; assets: Record<string, Asset> }> {
+export function imageWorldSize(width: number, height: number, pixelRatio: number, maxSize?: { w: number; h: number }) {
+  const scale = Math.min(1 / pixelRatio, maxSize ? maxSize.w / width : Infinity, maxSize ? maxSize.h / height : Infinity);
+  return { w: Math.max(1, width * scale), h: Math.max(1, height * scale) };
+}
+
+export function canPreserveImage(width: number, height: number, bytes: number, mime: string): boolean {
+  const dataLength = `data:${mime};base64,`.length + Math.ceil(bytes / 3) * 4;
+  return Math.max(width, height) <= MAX_IMAGE_SIDE && dataLength <= DOCUMENT_LIMITS.assetData;
+}
+
+export async function importImages(files: File[], at: Point, view?: { maxWorld: { w: number; h: number }; pixelRatio: number; centered?: boolean }): Promise<{ nodes: FlowNode[]; assets: Record<string, Asset> }> {
   if (files.length > 20) throw new Error('이미지는 한 번에 20개까지 추가할 수 있습니다.');
   const nodes: FlowNode[] = [];
   const assets: Record<string, Asset> = {};
@@ -314,35 +324,47 @@ export async function importImages(files: File[], at: Point): Promise<{ nodes: F
     let image: HTMLImageElement | undefined;
     try {
       image = await imageFromURL(objectURL);
-      const ratio = Math.min(1, MAX_IMAGE_SIDE / Math.max(image.naturalWidth, image.naturalHeight));
-      let width = Math.max(1, Math.round(image.naturalWidth * ratio));
-      let height = Math.max(1, Math.round(image.naturalHeight * ratio));
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext('2d');
-      if (!context) throw new Error('이미지를 준비할 수 없습니다. 앱을 다시 열어주세요.');
-      context.imageSmoothingQuality = 'high';
-      context.drawImage(image, 0, 0, width, height);
-      let data = header.mime === 'image/jpeg' ? canvas.toDataURL('image/jpeg', 0.88) : canvas.toDataURL('image/png');
-      while (data.length > DOCUMENT_LIMITS.assetData && width > 64 && height > 64) {
-        width = Math.max(1, Math.floor(width * 0.75));
-        height = Math.max(1, Math.floor(height * 0.75));
-        canvas.width = width;
-        canvas.height = height;
-        context.imageSmoothingQuality = 'high';
-        context.drawImage(image, 0, 0, width, height);
-        data = header.mime === 'image/jpeg' ? canvas.toDataURL('image/jpeg', 0.88) : canvas.toDataURL('image/png');
+      let width = image.naturalWidth, height = image.naturalHeight, data: string;
+      if (canPreserveImage(width, height, blob.size, blob.type)) {
+        data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('이미지를 준비할 수 없습니다. 앱을 다시 열어주세요.'));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(blob);
+        });
+      } else {
+        const ratio = Math.min(1, MAX_IMAGE_SIDE / Math.max(width, height));
+        width = Math.max(1, Math.round(width * ratio));
+        height = Math.max(1, Math.round(height * ratio));
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('이미지를 준비할 수 없습니다. 앱을 다시 열어주세요.');
+        try {
+          for (;;) {
+            canvas.width = width;
+            canvas.height = height;
+            context.imageSmoothingQuality = 'high';
+            context.drawImage(image, 0, 0, width, height);
+            data = header.mime === 'image/jpeg' ? canvas.toDataURL('image/jpeg', 0.92) : canvas.toDataURL('image/png');
+            if (data.length <= DOCUMENT_LIMITS.assetData) break;
+            if (width <= 64 || height <= 64) throw new Error(`“${file.name}”을 줄일 수 없습니다. 더 작은 이미지로 다시 시도하세요.`);
+            width = Math.floor(width * 0.75);
+            height = Math.floor(height * 0.75);
+          }
+        } finally {
+          canvas.width = canvas.height = 1;
+        }
       }
-      if (data.length > DOCUMENT_LIMITS.assetData) throw new Error(`“${file.name}”을 줄일 수 없습니다. 더 작은 이미지로 다시 시도하세요.`);
-      canvas.width = canvas.height = 1;
       const assetId = uid();
       const asset: Asset = { id: assetId, data, name: file.name || '붙여넣은 이미지', width, height };
       assets[assetId] = asset;
-      const node = createNode('image', at.x + index * 28, at.y + index * 28);
-      const displayRatio = Math.min(1, 520 / width, 640 / height);
-      node.w = Math.max(1, width * displayRatio);
-      node.h = Math.max(1, height * displayRatio);
+      const { w, h } = view
+        ? imageWorldSize(image.naturalWidth, image.naturalHeight, view.pixelRatio, { w: view.maxWorld.w * .85, h: view.maxWorld.h * .85 })
+        : imageWorldSize(width, height, 1, { w: 520, h: 640 });
+      const offset = index * 28;
+      const node = createNode('image', at.x + offset - (view?.centered ? w / 2 : 0), at.y + offset - (view?.centered ? h / 2 : 0));
+      node.w = w;
+      node.h = h;
       node.assetId = assetId;
       node.text = '';
       node.fill = '#ffffff';

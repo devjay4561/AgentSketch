@@ -2,7 +2,7 @@ import './canvas-tools.css';
 import {fitTextHeight} from './text-fit.ts';
 import type { FlowNode, Port, ShapeKind } from './types.ts';
 import type { CropRegion, WorkbenchHost } from './workspace-types.ts';
-import { importImages } from './persistence.ts';
+import { imageWorldSize, importImages } from './persistence.ts';
 import { DOCUMENT_LIMITS } from './model.ts';
 import { availableRouteSegments, fixRouteSegment, releaseRouteSegment, fixedRouteSegments } from './route-segments.ts';
 import { editableNodeIds } from './organization.ts';
@@ -70,7 +70,9 @@ export function mountCanvasTools(host: WorkbenchHost, container: HTMLElement) {
         if(node.kind!=='image'&&node.kind!=='draw') content+=`<section><h3>도형 바꾸기</h3><label>도형 종류<select data-canvas-field="kind" aria-label="도형 종류 변경"${locked(node)?' disabled':''}>${Object.entries(shapeNames).map(([kind,name])=>`<option value="${kind}"${node.kind===kind?' selected':''}>${name}</option>`).join('')}</select></label><p class="ct-help">내용, 연결, 자료 정보는 그대로 유지합니다.</p></section>`;
         if(node.kind==='image'){
           const crop=node.crop??{x:0,y:0,w:1,h:1};
-          content+=`<section><h3>이미지</h3><div class="ct-actions">${button('replace-image',busy?'불러오는 중…':'이미지 교체',locked(node)||busy)}${button('reset-image','원래 보기',locked(node))}</div><p class="ct-help">교체해도 위치·설명·연결은 유지됩니다. 원본 화면을 바꾸므로 기존 자르기는 초기화합니다.</p><div class="ct-grid">${(['x','y','w','h'] as const).map((key,i)=>`<label>${['시작 X','시작 Y','너비','높이'][i]} (%)<input type="number" data-canvas-field="crop-${key}" aria-label="이미지 자르기 ${key}" min="${i>1?1:0}" max="100" step="1" value="${Math.round(crop[key]*100)}"${locked(node)?' disabled':''}></label>`).join('')}</div><label>이미지 내용 회전<select data-canvas-field="rotation" aria-label="이미지 회전"${locked(node)?' disabled':''}>${[0,90,180,270].map(angle=>`<option value="${angle}"${(node.rotation??0)===angle?' selected':''}>${angle}°</option>`).join('')}</select></label><p class="ct-help">상자와 연결점은 고정되고 이미지 내용만 회전합니다. 상자 밖으로 나가는 부분은 잘립니다.</p></section>`;
+          content+=`<section><h3>이미지</h3><div class="ct-actions">${button('replace-image',busy?'불러오는 중…':'이미지 교체',locked(node)||busy)}${button('reset-image','원래 보기',locked(node))}</div>`;
+          content+=`<div class="ct-actions">${button('original-image-size','원본 크기로',locked(node)||!node.assetId||!doc.assets[node.assetId])}</div>`;
+          content+=`<p class="ct-help">교체해도 위치·설명·연결은 유지됩니다. 원본 화면을 바꾸므로 기존 자르기는 초기화합니다.</p><div class="ct-grid">${(['x','y','w','h'] as const).map((key,i)=>`<label>${['시작 X','시작 Y','너비','높이'][i]} (%)<input type="number" data-canvas-field="crop-${key}" aria-label="이미지 자르기 ${key}" min="${i>1?1:0}" max="100" step="1" value="${Math.round(crop[key]*100)}"${locked(node)?' disabled':''}></label>`).join('')}</div><label>이미지 내용 회전<select data-canvas-field="rotation" aria-label="이미지 회전"${locked(node)?' disabled':''}>${[0,90,180,270].map(angle=>`<option value="${angle}"${(node.rotation??0)===angle?' selected':''}>${angle}°</option>`).join('')}</select></label><p class="ct-help">상자와 연결점은 고정되고 이미지 내용만 회전합니다. 상자 밖으로 나가는 부분은 잘립니다.</p></section>`;
         }
       }
     }else if(edge){
@@ -149,6 +151,16 @@ export function mountCanvasTools(host: WorkbenchHost, container: HTMLElement) {
       copiedFormat={fill:n.fill,stroke:n.stroke,color:n.color,fontSize:n.fontSize,bold:n.bold,align:n.align,strokeWidth:n.strokeWidth,dashed:n.dashed,opacity:n.opacity};host.toast('서식을 복사했습니다.');update();return;
     }
     if(action==='replace-image'){void replaceImage();return;}
+    if(action==='original-image-size'&&node?.kind==='image'&&node.assetId){
+      const asset=doc.assets[node.assetId];if(!asset)return;
+      const {w,h}=imageWorldSize(asset.width*(node.crop?.w??1),asset.height*(node.crop?.h??1),window.devicePixelRatio||1);
+      const x=node.x+(node.w-w)/2,y=node.y+(node.h-h)/2;
+      if(Math.abs(x)>DOCUMENT_LIMITS.coordinate||Math.abs(y)>DOCUMENT_LIMITS.coordinate){host.toast('작업지 좌표 범위를 벗어납니다.',true);return;}
+      if(w!==node.w||h!==node.h)host.mutate(()=>{
+        Object.assign(node,{x,y,w,h});
+      });
+      update();return;
+    }
     if(action==='paste-format'&&copiedFormat)host.mutate(()=>nodes.forEach(n=>Object.assign(n,copiedFormat)),'서식을 적용했습니다.');
     if(action==='fit-text')host.mutate(()=>{
       const ctx=document.createElement('canvas').getContext('2d');if(!ctx)return;

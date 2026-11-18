@@ -4,17 +4,22 @@ import { FONT_FAMILY, PALETTE } from './theme.ts';
 import { renderRichContent, svgRichContent, WRAP_TOKENS } from './rich-render.ts';
 import { layoutEdgeLabels, type EdgeLabel } from './edge-labels.ts';
 import { t } from './i18n.ts';
+import { graphicsProfile } from './graphics.ts';
 
 const FONT = FONT_FAMILY;
 const PAPER = PALETTE.paper;
 const ACCENT = PALETTE.accent;
 const REMOTE = '#2F6FED';
-const IMAGE_PIXELS = 8_000_000;
 const IMAGE_COUNT = 64;
 const PAD = 40;
 
-type Bitmap = ImageBitmap | HTMLImageElement;
-type CachedImage = { data: string; bitmap?: Bitmap; loading: boolean; failed: boolean; pixels: number; last: number; maximum: number };
+type Bitmap = ImageBitmap | HTMLImageElement | HTMLCanvasElement;
+type CachedImage = { data: string; bitmap?: Bitmap; loading: boolean; failed: number | null; pixels: number; maximum: number };
+
+export function quantizeImageSide(wanted: number, limit: number): number {
+  const step = Math.ceil(Math.log(Math.max(32, wanted) / 32) / Math.log(1.25));
+  return Math.min(limit, Math.ceil(32 * 1.25 ** step));
+}
 
 function intersects(a: Box, b: Box): boolean {
   return a.x <= b.x + b.w && a.x + a.w >= b.x && a.y <= b.y + b.h && a.y + a.h >= b.y;
@@ -28,29 +33,47 @@ function rasterData(data: string): boolean {
   return /^data:image\/(png|jpeg|webp|gif);base64,[a-zA-Z0-9+/=\r\n]+$/.test(data);
 }
 
-async function decodeImage(asset: Asset, maximum = 2048): Promise<Bitmap> {
-  if (!rasterData(asset.data)) throw new Error('지원하지 않는 이미지입니다.');
+function decodedImageSize(asset: Asset, maximum: number) {
   const ratio = Math.min(1, maximum / Math.max(asset.width, asset.height));
+  return { width: Math.max(1, Math.round(asset.width * ratio)), height: Math.max(1, Math.round(asset.height * ratio)) };
+}
+
+async function decodeImage(asset: Asset, maximum: number): Promise<Bitmap> {
+  if (!rasterData(asset.data)) throw new Error('지원하지 않는 이미지입니다.');
+  const { width, height } = decodedImageSize(asset, maximum);
   if (typeof createImageBitmap === 'function') {
     const raw = atob(asset.data.substring(asset.data.indexOf(',') + 1));
     const bytes = new Uint8Array(raw.length);
     for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
     const type = asset.data.substring(5, asset.data.indexOf(';'));
     return createImageBitmap(new Blob([bytes], { type }), {
-      resizeWidth: Math.max(1, Math.round(asset.width * ratio)),
-      resizeHeight: Math.max(1, Math.round(asset.height * ratio)),
+      resizeWidth: width,
+      resizeHeight: height,
       resizeQuality: 'high',
     });
   }
   const image = new Image();
   image.src = asset.data;
   await image.decode();
-  return image;
+  if (image.width === width && image.height === height) return image;
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('이미지를 준비할 수 없습니다. 앱을 다시 열어주세요.');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(image, 0, 0, width, height);
+    return canvas;
+  } finally {
+    image.src = '';
+  }
 }
 
 function closeImage(bitmap?: Bitmap): void {
   if (bitmap && 'close' in bitmap) bitmap.close();
-  else if (bitmap) bitmap.src = '';
+  else if (bitmap && 'src' in bitmap) bitmap.src = '';
+  else if (bitmap) bitmap.width = bitmap.height = 1;
 }
 
 export function lineSegments(text: string, width: number, measure: (text: string) => number): string[] {
@@ -153,6 +176,8 @@ function drawNode(ctx: CanvasRenderingContext2D, node: FlowNode, bitmap?: Bitmap
       const crop=node.crop??{x:0,y:0,w:1,h:1};
       ctx.save();
       if(node.rotation){ctx.translate(node.x+node.w/2,node.y+node.h/2);ctx.rotate(node.rotation*Math.PI/180);ctx.translate(-node.x-node.w/2,-node.y-node.h/2);}
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = graphicsProfile().smoothing;
       ctx.drawImage(bitmap,crop.x*bitmap.width,crop.y*bitmap.height,crop.w*bitmap.width,crop.h*bitmap.height,node.x,node.y,node.w,node.h);
       ctx.restore();
       if (node.text) { ctx.fillStyle = 'rgba(255,255,255,.93)'; ctx.fillRect(node.x, node.y + node.h - 40, node.w, 40); }
@@ -235,7 +260,7 @@ export class Renderer {
   private ratio = 1;
   private images = new Map<string, CachedImage>();
   private imagePixels = 0;
-  private generation = 0;
+  private reservedImagePixels = 0;
   private disposed = false;
   private decodes = 0;
   private imageQueue: Array<() => Promise<void>> = [];
@@ -249,7 +274,7 @@ export class Renderer {
 
   resize(width: number, height: number): void {
     this.width = Math.max(1, width); this.height = Math.max(1, height);
-    this.ratio = Math.min(2, window.devicePixelRatio || 1);
+    this.ratio = Math.min(graphicsProfile().maxPixelRatio, window.devicePixelRatio || 1);
     this.canvas.width = Math.round(this.width * this.ratio);
     this.canvas.height = Math.round(this.height * this.ratio);
     this.canvas.style.width = `${this.width}px`; this.canvas.style.height = `${this.height}px`;
@@ -269,38 +294,46 @@ export class Renderer {
     }
   }
 
-  private requestImage(asset: Asset, maximum: number, pixelsBudget: number): CachedImage {
+  private requestImage(asset: Asset, maximum: number, limit: number, pixelsBudget: number): void {
     let entry = this.images.get(asset.id);
-    if (entry && (entry.data !== asset.data || (!entry.loading && !entry.failed && (maximum > entry.maximum * 1.8 || entry.pixels > pixelsBudget * 1.01)))) { this.evict(asset.id); entry = undefined; }
-    if (entry) { entry.last = this.generation; return entry; }
-    entry = { data: asset.data, loading: true, failed: false, pixels: 0, last: this.generation, maximum };
-    this.images.set(asset.id, entry);
+    if (!entry) {
+      entry = { data: asset.data, loading: false, failed: null, pixels: 0, maximum: 0 };
+      this.images.set(asset.id, entry);
+    }
+    if (entry.loading || entry.failed === maximum) return;
+    const upgrade = maximum > entry.maximum * graphicsProfile().redecodeFactor || (maximum === limit && limit > entry.maximum);
+    if (!upgrade && entry.pixels <= pixelsBudget && entry.maximum <= limit) return;
+    const { width, height } = decodedImageSize(asset, maximum);
+    const growth = Math.max(0, width * height - entry.pixels);
+    // Wait for larger thumbnails to shrink instead of evicting a visible bitmap mid-decode.
+    if (growth && this.imagePixels + this.reservedImagePixels + growth > graphicsProfile().imagePixels) return;
+    this.reservedImagePixels += growth;
+    entry.loading = true;
     const created = entry;
     this.imageQueue.push(async () => {
-      if (this.disposed || this.images.get(asset.id) !== created) return;
-      await decodeImage(asset, maximum).then(bitmap => {
-      if (this.disposed || this.images.get(asset.id) !== created) { closeImage(bitmap); return; }
-      created.loading = false; created.bitmap = bitmap; created.pixels = bitmap.width * bitmap.height;
-      this.imagePixels += created.pixels;
-      // Retain the current visible pass. Old offscreen assets are released first.
-      for (const [id, old] of [...this.images].sort((a, b) => a[1].last - b[1].last)) {
-        if (this.imagePixels <= IMAGE_PIXELS && this.images.size <= IMAGE_COUNT) break;
-        if (old.last < this.generation && !old.loading) this.evict(id);
+      try {
+        if (this.disposed || this.images.get(asset.id) !== created) return;
+        const bitmap = await decodeImage(asset, maximum);
+        if (this.disposed || this.images.get(asset.id) !== created) { closeImage(bitmap); return; }
+        const pixels = bitmap.width * bitmap.height;
+        closeImage(created.bitmap);
+        this.imagePixels += pixels - created.pixels;
+        Object.assign(created, { bitmap, pixels, maximum, failed: null });
+      } catch {
+        created.failed = maximum;
+      } finally {
+        this.reservedImagePixels -= growth;
+        created.loading = false;
+        if (!this.disposed && (growth || this.images.get(asset.id) === created)) this.invalidate();
       }
-      this.invalidate();
-    }).catch(() => {
-      if (this.images.get(asset.id) === created) { created.loading = false; created.failed = true; this.invalidate(); }
-    });
     });
     this.pumpImages();
-    return entry;
   }
 
   render(state: RenderState): void {
     if (this.disposed) return;
     const { doc } = state, { x, y, zoom } = doc.viewport, ctx = this.ctx;
     const nodeIndex = new Map(doc.nodes.map(node => [node.id, node])); prepareRoutes(doc, nodeIndex);
-    this.generation++;
     for (const [id, cached] of this.images) if (!doc.assets[id] || doc.assets[id].data !== cached.data) this.evict(id);
     ctx.setTransform(this.ratio, 0, 0, this.ratio, 0, 0);
     ctx.fillStyle = PAPER; ctx.fillRect(0, 0, this.width, this.height);
@@ -318,11 +351,25 @@ export class Renderer {
     const visibleNodes = doc.nodes.filter(node => intersects(node, visible));
     const imageNodes = visibleNodes.filter(node => node.kind === 'image' && node.assetId && doc.assets[node.assetId]);
     imageNodes.sort((a, b) => Math.hypot(a.x + a.w / 2 - (visible.x + visible.w / 2), a.y + a.h / 2 - (visible.y + visible.h / 2)) - Math.hypot(b.x + b.w / 2 - (visible.x + visible.w / 2), b.y + b.h / 2 - (visible.y + visible.h / 2)));
-    const activeImages = new Set(imageNodes.map(node => node.assetId!).slice(0, IMAGE_COUNT));
+    const activeImages = new Map<string, number>();
+    for (const node of imageNodes) {
+      const id = node.assetId!, asset = doc.assets[id], previous = activeImages.get(id);
+      if (previous === undefined && activeImages.size >= IMAGE_COUNT) continue;
+      const scale = Math.max(node.w / (asset.width * (node.crop?.w ?? 1)), node.h / (asset.height * (node.crop?.h ?? 1)));
+      activeImages.set(id, Math.max(previous ?? 0, scale * zoom * this.ratio * Math.max(asset.width, asset.height)));
+    }
     // A large overview gets smaller decoded thumbnails, not a full-resolution
     // bitmap per photograph. Retain at most the closest 64 visible assets.
     for (const [id] of this.images) if (!activeImages.has(id)) this.evict(id);
-    const imageBudget = IMAGE_PIXELS / Math.max(1, activeImages.size);
+    const profile = graphicsProfile();
+    const imageBudget = profile.imagePixels / Math.max(1, activeImages.size);
+    for (const [id, wanted] of activeImages) {
+      const asset = doc.assets[id], side = Math.max(asset.width, asset.height), aspect = side / Math.min(asset.width, asset.height);
+      let limit = Math.floor(Math.min(side, profile.imageMaxSide, imageBudget, Math.sqrt(imageBudget * aspect)));
+      const shortSide = Math.max(1, Math.round(limit / aspect));
+      limit = Math.min(limit, Math.floor(imageBudget / shortSide));
+      this.requestImage(asset, quantizeImageSide(wanted, limit), limit, imageBudget);
+    }
     for (const node of visibleNodes) if (node.kind === 'frame') drawNode(ctx, node, undefined, false, node.fontSize * zoom >= 5);
     const paths=new Map(doc.edges.map(e=>[e.id,edgePoints(e,doc,nodeIndex)]));
     ctx.font=`12px ${FONT}`;const labels=layoutEdgeLabels(doc,paths,t=>ctx.measureText(t).width);
@@ -338,14 +385,8 @@ export class Renderer {
     }
     for (const node of visibleNodes) {
       if (node.kind === 'frame') continue;
-      let cached: CachedImage | undefined;
-      if (node.kind === 'image' && node.assetId && activeImages.has(node.assetId)) {
-        const asset = doc.assets[node.assetId];
-        const aspect = Math.max(asset.width, asset.height) / Math.max(1, Math.min(asset.width, asset.height));
-        const maximum = Math.max(32, Math.floor(Math.min(2048, Math.sqrt(imageBudget * aspect), Math.max(node.w, node.h) * zoom * this.ratio / Math.max(.05,Math.min(node.crop?.w??1,node.crop?.h??1)))));
-        cached = this.requestImage(asset, maximum, imageBudget);
-      }
-      drawNode(ctx, node, cached?.bitmap, cached?.failed, node.fontSize * zoom >= 5);
+      const cached = node.kind === 'image' && node.assetId ? this.images.get(node.assetId) : undefined;
+      drawNode(ctx, node, cached?.bitmap, Boolean(cached?.failed), node.fontSize * zoom >= 5);
     }
     const activeEdge=doc.edges.find(e=>e.id===state.edgeSelection);
     if(activeEdge?.style==='elbow'){
