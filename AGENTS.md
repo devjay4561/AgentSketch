@@ -5,7 +5,7 @@
 - Go + Wails v2.17.0, TypeScript + Canvas 2D. Node 서버는 개발용이며 배포는 임베드된 단일 실행 파일이다.
 - 빌드: `powershell` 또는 `pwsh`에서 `./scripts/build.ps1`. 코드 검사: `npm run build`, `npm test`, `go test ./...`, `go test github.com/wailsapp/go-webview2/pkg/edge -run AgentSketch`.
 - Windows에서 새 브라우저/WebView 프로필은 반드시 `--disable-features=AutofillAiWalletPrivatePasses`를 실제 브라우저 인자로 전달한다. Wails가 환경변수를 지우므로 `third_party/go-webview2/AGENTSKETCH-PATCH.md`의 로컬 패치를 유지한다. 공유 모듈 캐시는 수정하지 않는다.
-- 기본 GPU 비활성화는 이 PC의 같은 보드 비교 측정을 근거로 한다. 성능을 바꿀 때는 프로세스 트리 메모리와 렌더 비용을 같은 조건에서 확인한다. 실행 시 디버그 포트를 기본 활성화하지 않는다.
+- GPU는 기본 켜짐이며 파일 메뉴의 고품질 그래픽 설정(또는 AGENTSKETCH_ENABLE_GPU=0/1)으로 끈다. 성능을 바꿀 때는 두 모드 모두 프로세스 트리 메모리와 렌더 비용을 같은 조건에서 확인한다. 실행 시 디버그 포트를 기본 활성화하지 않는다.
 - 문서 포맷은 `src/types.ts`와 `validateDocument`가 계약이다. `.agentsketch`는 이미지가 포함된 JSON이며 변경 시 기존 파일 열기와 저장 후 재열기를 확인한다.
 - 이미지 문자열은 이력에서 공유하며 디코딩 캐시는 제한한다. 지속적인 requestAnimationFrame 루프를 추가하지 않는다. 최적화는 내보내기의 원본 내용과 글자를 누락시키면 안 된다.
 - 새 문서를 열 때 이력을 초기화한다. 다른 파일의 내용이 Undo로 현재 파일에 덮어써지는 문제를 재도입하지 않는다.

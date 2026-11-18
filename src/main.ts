@@ -20,6 +20,21 @@ import { icon } from './icons.ts';
 import { FONT_FAMILY, PALETTE } from './theme.ts';
 import { setupUIFeedback } from './ui-feedback.ts';
 import { installDomTranslation, lang, setLang, t } from './i18n.ts';
+import { setGraphicsProfile } from './graphics.ts';
+
+type GraphicsSettings = { saved: boolean; active: boolean; envOverride: boolean };
+type LaunchDocument = { path: string; data: string };
+type DesktopApp = {
+  GetGraphicsSettings?(): Promise<GraphicsSettings>;
+  SetGPUEnabled(enabled: boolean): Promise<void>;
+  RequestRestart(): Promise<void>;
+  CancelRestart?(): Promise<void>;
+  GetRestartDocumentPath?(): Promise<string | null>;
+  TakeLaunchDocument?(): Promise<LaunchDocument | null>;
+  OpenRecentDocument(path: string): Promise<LaunchDocument>;
+  SetActiveDocumentPath(path: string): Promise<void>;
+};
+const desktop = (window as Window & { go?: { main?: { App?: DesktopApp } } }).go?.main?.App;
 
 installDomTranslation();
 setupUIFeedback();
@@ -54,6 +69,8 @@ let tabs:ReturnType<typeof mountDocumentTabs>|undefined;
 let workbench:ReturnType<typeof mountWorkbench>|undefined;
 let pathChange:Promise<unknown>=Promise.resolve();
 let booting = true, revision = 0, operationBusy = false;
+let graphicsSettings: GraphicsSettings | undefined;
+let closing = false;
 let lastSavedRecovery = 0;
 let aiChanged = new Set<string>(), aiTimer: ReturnType<typeof setTimeout> | undefined, aiFollow = localStorage.getItem('agentsketch.ai-follow') !== '0';
 type Gesture = {
@@ -527,6 +544,20 @@ function replaceDocument(next: FlowDocument, path = '') {
   const bridge=(window as any).go?.main?.App;
   if(bridge?.SetActiveDocumentPath)pathChange=pathChange.then(()=>bridge.SetActiveDocumentPath(path)).catch(error=>toast(String(error),true)); history.clear(); doc = next; selected.clear(); selectedEdge = null; connecting = null; filePath = path; dirty = false; revision++; updateUI(); invalidate(); queueRecovery(); }
 async function openDropped(file: File) { try { if (file.size > 80 * 1024 * 1024) throw new Error('문서가 너무 큽니다. 최대 80 MB까지 열 수 있습니다.'); const next = validateDocument(JSON.parse(await file.text())); if (await guardReplace()) replaceDocument(next); } catch (error) { toast(`보드를 열지 못했습니다. ${String(error)}`, true); } }
+
+function updateGraphicsMenu(settings: GraphicsSettings) {
+  graphicsSettings = settings;
+  const button = $<HTMLButtonElement>('graphics-gpu');
+  const enabled = settings.envOverride ? settings.active : settings.saved;
+  const status = [t(enabled ? '켬' : '끔')];
+  if (settings.envOverride) status.push(t('환경 변수로 GPU 설정이 고정되어 있습니다.'));
+  else if (settings.saved !== settings.active) status.push(t('다시 시작 필요'));
+  $('graphics-gpu-status').textContent = status.join(' · ');
+  button.setAttribute('aria-pressed', String(enabled));
+  button.disabled = settings.envOverride;
+  button.hidden = false;
+}
+
 async function runAction(action: string) {
   switch (action) {
     case 'next-step': if(selected.size===1)mutate(()=>{const id=addNextStep(doc,[...selected][0]);selected=new Set([id]);},'다음 단계를 추가했습니다.');break;
@@ -574,6 +605,17 @@ async function runAction(action: string) {
       toast('보드를 내보내고 있습니다…'); const path = await exportFile(projectVisibleDocument(doc), action.slice(7) as 'png' | 'svg' | 'pdf' | 'html'); if (path) toast('내보내기를 완료했습니다.'); break;
     }
     case 'language': setLang(lang === 'ko' ? 'en' : 'ko'); toast(lang === 'ko' ? 'Restart AgentSketch to switch to English. · 다시 시작하면 영어로 바뀝니다.' : '다시 시작하면 한국어로 바뀝니다. · Restart AgentSketch to switch to Korean.'); break;
+    case 'graphics-gpu': {
+      if (!desktop || !graphicsSettings || graphicsSettings.envOverride || closing) break;
+      const saved = !graphicsSettings.saved;
+      await desktop.SetGPUEnabled(saved);
+      updateGraphicsMenu({ ...graphicsSettings, saved });
+      if (saved !== graphicsSettings.active && await confirmChoice(
+        '그래픽 설정 적용', '새 그래픽 설정을 적용하려면 AgentSketch를 다시 시작하세요.',
+        [{ label: '지금 다시 시작', value: 'restart' }, { label: '나중에', value: 'later' }],
+      ) === 'restart' && !closing) await desktop.RequestRestart();
+      break;
+    }
     case 'template-launch': case 'template-simple': if (await guardReplace()) { replaceDocument(createSample(action === 'template-launch' ? 'launch' : 'simple')); dirty = true; fit(); toast('설명용 예시를 열었습니다. 자유롭게 편집하세요.'); } break;
     case 'help': $<HTMLDialogElement>('help-dialog').showModal(); break;
     case 'focus': $('app').classList.toggle('focus-mode'); break;
@@ -581,7 +623,7 @@ async function runAction(action: string) {
   }
 }
 async function action(name: string) {
-  const long = ['document-card','relink-document','open-linked-document','new', 'open', 'save', 'save-as', 'template-launch', 'template-simple', 'export-png', 'export-svg', 'export-pdf', 'export-html'].includes(name);
+  const long = ['document-card','relink-document','open-linked-document','new', 'open', 'save', 'save-as', 'template-launch', 'template-simple', 'export-png', 'export-svg', 'export-pdf', 'export-html', 'graphics-gpu'].includes(name);
   if (long && operationBusy) return;
   if (long) operationBusy = true;
   try { await runAction(name); } catch (error) { toast(`작업을 완료하지 못했습니다. ${String(error)}`, true); } finally { if (long) operationBusy = false; }
@@ -668,9 +710,32 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && !bo
 
 async function initialize() {
   try { await document.fonts.load('500 13px "Pretendard Variable"', '월간보고 AgentSketch'); } catch { /* System fallback keeps the editor usable. */ }
+  try {
+    const settings = await desktop?.GetGraphicsSettings?.();
+    if (settings) {
+      setGraphicsProfile(settings.active);
+      updateGraphicsMenu(settings);
+    }
+  } catch (error) { toast(t('그래픽 설정을 읽지 못했습니다. {0}', error), true); }
   renderer.resize(wrap.clientWidth, wrap.clientHeight);
-  try { const launch=await (window as any).go?.main?.App?.TakeLaunchDocument?.();const recovered=launch?validateDocument(JSON.parse(launch.data)):await loadAutosave();if(launch){filePath=launch.path;pathChange=(window as any).go.main.App.SetActiveDocumentPath(filePath);} if (recovered) { doc = recovered; dirty = !launch; toast(launch?'문서 파일을 열었습니다.':'이 PC에 저장된 마지막 작업을 복구했습니다.'); } else { doc = createSample('launch'); requestAnimationFrame(() => fit()); } }
-  catch (error) { doc = createSample('launch'); toast(`이전 작업을 복구하지 못했습니다. 저장한 파일을 열 수 있습니다. ${String(error)}`, true); requestAnimationFrame(() => fit()); }
+  invalidate();
+  try {
+    const restartPath = await desktop?.GetRestartDocumentPath?.();
+    const recovered = restartPath == null ? null : await loadAutosave();
+    const launch = recovered ? null
+      : restartPath ? await desktop?.OpenRecentDocument(restartPath) : await desktop?.TakeLaunchDocument?.();
+    const initial = launch ? validateDocument(JSON.parse(launch.data)) : recovered ?? await loadAutosave();
+    if (initial) {
+      doc = initial;
+      dirty = !launch;
+      toast(launch ? '문서 파일을 열었습니다.' : '이 PC에 저장된 마지막 작업을 복구했습니다.');
+      const path = launch?.path ?? restartPath;
+      if (path && desktop) {
+        try { await desktop.SetActiveDocumentPath(path); filePath = path; }
+        catch (error) { toast(String(error), true); }
+      }
+    } else { doc = createSample('launch'); requestAnimationFrame(() => fit()); }
+  } catch (error) { doc = createSample('launch'); toast(`이전 작업을 복구하지 못했습니다. 저장한 파일을 열 수 있습니다. ${String(error)}`, true); requestAnimationFrame(() => fit()); }
   booting = false; tabs=mountDocumentTabs({...workbenchHost,commitEditing:finishEdit,setDirty:value=>{dirty=value;updateUI();},restoreTab:async(next,path,wasDirty)=>{finishEdit();replaceDocument(next,path);dirty=wasDirty;updateUI();return true;}},$('document-tabs'));setTool('select'); updateToggles(); updateUI(); invalidate(); queueRecovery();
   if (isNative) {
     document.querySelector('[data-action="ai-follow"]')?.setAttribute('aria-pressed',String(aiFollow));
@@ -693,10 +758,27 @@ async function initialize() {
       if(command.startsWith('presentation.')){document.querySelector<HTMLButtonElement>(`[data-present="${command.split('.')[1]}"]`)?.click();return {active:document.body.classList.contains('fp-presenting')};}
       throw new CommandError('UNKNOWN_COMMAND',command);
     }});
-    const native = (window as unknown as { go: { main: { App: { Ready(): Promise<void>; CloseWithRecovery(data: string): Promise<void>;CloseWithRecoveryForDocument?(data:string,path:string):Promise<void> } } }; runtime: { EventsOn(name: string, fn: () => void): void } });
-    native.runtime.EventsOn('agentsketch:closing', () => {
-      finishEdit(); clearTimeout(saveTimer);
-      void (tabs?.flush()??Promise.resolve()).catch(error=>toast(`탭 복구 보관: ${String(error)}`,true)).then(()=>pathChange).then(()=>autosave(doc,filePath)).then(() => native.go.main.App.CloseWithRecoveryForDocument?native.go.main.App.CloseWithRecoveryForDocument(JSON.stringify(doc),filePath):native.go.main.App.CloseWithRecovery(JSON.stringify(doc))).catch(error => toast(`작업을 보존하지 못해 종료를 멈췄습니다. 파일로 저장하세요. ${String(error)}`, true));
+    const native = (window as unknown as { go: { main: { App: { Ready(): Promise<void>; CloseWithRecovery(data: string): Promise<void>;CloseWithRecoveryForDocument?(data:string,path:string):Promise<void> } } }; runtime: { EventsOn(name: string, fn: (restart?: boolean) => void): void } });
+    native.runtime.EventsOn('agentsketch:closing', async restart => {
+      if (closing) return;
+      closing = true;
+      try {
+        finishEdit();
+        clearTimeout(saveTimer);
+        await tabs?.flush().catch(error => {
+          if (restart) throw error;
+          toast(`탭 복구 보관: ${String(error)}`, true);
+        });
+        await pathChange;
+        await autosave(doc, filePath);
+        const data = JSON.stringify(doc);
+        const api = native.go.main.App;
+        if (api.CloseWithRecoveryForDocument) await api.CloseWithRecoveryForDocument(data, filePath);
+        else await api.CloseWithRecovery(data);
+      } catch (error) {
+        if (restart) await desktop?.CancelRestart?.();
+        toast(`작업을 보존하지 못해 종료를 멈췄습니다. 파일로 저장하세요. ${String(error)}`, true);
+      } finally { closing = false; }
     });
     native.runtime.EventsOn('agentsketch:open-file',()=>{void (async()=>{try{const result=await (window as any).go.main.App.TakeLaunchDocument();if(result&&await guardReplace()){replaceDocument(validateDocument(JSON.parse(result.data)),result.path);fit();}}catch(error){toast(`파일을 열지 못했습니다. ${String(error)}`,true);}})();});
     await native.go.main.App.Ready();
