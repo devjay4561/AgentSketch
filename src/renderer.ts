@@ -170,7 +170,8 @@ function drawText(ctx: CanvasRenderingContext2D, node: FlowNode, fit: boolean): 
   ctx.beginPath(); ctx.rect(box.x, box.y, box.w, box.h); ctx.clip();
   ctx.font = `${weight} ${fontSize}px ${FONT}`;
   ctx.fillStyle = node.color;
-  ctx.textBaseline = 'middle';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fontKerning = 'normal';
   const align = node.kind === 'frame' ? 'left' : node.align;
   ctx.textAlign = align;
   const measure = (text: string) => ctx.measureText(text).width;
@@ -183,7 +184,14 @@ function drawText(ctx: CanvasRenderingContext2D, node: FlowNode, fit: boolean): 
   const top = node.kind === 'note' || node.kind === 'text' || node.kind === 'frame';
   const start = box.y + (top ? lh / 2 : Math.max(lh / 2, (box.h - lines.length * lh) / 2 + lh / 2));
   const tx = box.x + (align === 'center' ? box.w / 2 : align === 'right' ? box.w : 0);
-  lines.forEach((line, i) => ctx.fillText(line, tx, start + i * lh));
+  // 'middle' puts the baseline at a fractional device pixel; Hangul's many horizontal
+  // strokes then smear across two rows. Place the baseline ourselves and snap it.
+  // Font-level box metrics are the same for any probe text; fall back to Pretendard's ratio.
+  const metrics = ctx.measureText('Ag');
+  const shift = Number.isFinite(metrics.fontBoundingBoxAscent) ? (metrics.fontBoundingBoxAscent - metrics.fontBoundingBoxDescent) / 2 : fontSize * .35;
+  const m = typeof ctx.getTransform === 'function' ? ctx.getTransform() : undefined;
+  const snap = (y: number) => fit || !m?.d ? y : (Math.round(m.d * y + m.f) - m.f) / m.d;
+  lines.forEach((line, i) => ctx.fillText(line, tx, snap(start + i * lh + shift)));
   ctx.restore();
 }
 
@@ -196,7 +204,7 @@ type ShapeEffects = 'flat' | 'low' | 'rich';
 
 function drawNode(ctx: CanvasRenderingContext2D, node: FlowNode, bitmap?: Bitmap, imageFailed = false, textVisible = true, effects: ShapeEffects = 'flat', pixelScale = 1, fitText = false, simplified = false): void {
   ctx.save();
-  ctx.globalAlpha = node.opacity ?? 1;
+  ctx.globalAlpha *= node.opacity ?? 1;
   ctx.lineWidth = node.strokeWidth;
   ctx.lineJoin = 'round'; ctx.lineCap = 'round';
   ctx.strokeStyle = node.stroke; ctx.fillStyle = node.fill;
@@ -350,10 +358,23 @@ function drawEdge(ctx: CanvasRenderingContext2D, edge: FlowEdge, points: Point[]
     if(leader.length){ctx.strokeStyle=edge.color;ctx.lineWidth=.8;ctx.beginPath();ctx.moveTo(leader[0].x,leader[0].y);for(const p of leader.slice(1))ctx.lineTo(p.x,p.y);ctx.stroke();}
     ctx.save();ctx.translate(center.x,center.y);ctx.rotate(angle*Math.PI/180);
     ctx.fillStyle=edge.labelBackground??'#fff';ctx.beginPath();ctx.roundRect(-textWidth/2,-textHeight/2,textWidth,textHeight,textHeight/2);ctx.fill();
-    ctx.globalAlpha=.25;ctx.strokeStyle=edge.color;ctx.lineWidth=1;ctx.stroke();ctx.globalAlpha=1;
+    const alpha=ctx.globalAlpha;ctx.globalAlpha=alpha*.25;ctx.strokeStyle=edge.color;ctx.lineWidth=1;ctx.stroke();ctx.globalAlpha=alpha;
     ctx.fillStyle=edge.color;ctx.font=EDGE_LABEL_FONT;ctx.textAlign='center';ctx.textBaseline='middle';
     lines.forEach((line,i)=>ctx.fillText(line,0,(i-(lines.length-1)/2)*EDGE_LABEL_LINE));ctx.restore();
   }
+  ctx.restore();
+}
+
+function focusRing(ctx: CanvasRenderingContext2D, node: FlowNode, zoom: number, rich: boolean, pixelScale: number, strength: number, primary: boolean): void {
+  const gap = (primary ? 3 : 2) / zoom, box = inflate(node, gap);
+  ctx.save(); ctx.setLineDash([]);
+  ctx.beginPath();
+  if (node.kind === 'ellipse') ctx.ellipse(node.x + node.w / 2, node.y + node.h / 2, node.w / 2 + gap, node.h / 2 + gap, 0, 0, Math.PI * 2);
+  else ctx.roundRect(box.x, box.y, box.w, box.h, Math.min(shapeRadius(node) + gap, box.w / 2, box.h / 2));
+  ctx.globalAlpha = primary ? strength : .55 * strength;
+  ctx.strokeStyle = ACCENT; ctx.lineWidth = (primary ? 2 : 1.25) / zoom;
+  if (rich && primary) { ctx.shadowColor = 'rgba(247,107,21,.45)'; ctx.shadowBlur = 10 * pixelScale; }
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -497,10 +518,18 @@ export class Renderer {
       limit = Math.min(limit, Math.floor(imageBudget / shortSide));
       this.requestImage(asset, quantizeImageSide(wanted, limit), limit, imageBudget);
     }
-    for (const node of visibleNodes) if (node.kind === 'frame') drawNode(ctx, node, undefined, false, node.fontSize * zoom >= 5, effects(node), pixelScale, false, simplified);
+    // Hover focus: the hovered box and its direct neighbours stay solid, the rest fades.
+    const hover = state.hover ? nodeIndex.get(state.hover) : undefined, focus = hover ? Math.max(0, Math.min(1, state.focus ?? 0)) : 0;
+    const related = new Set<string>(), relatedEdges = new Set<string>();
+    if (hover) for (const edge of doc.edges) if (edge.from === hover.id || edge.to === hover.id) { relatedEdges.add(edge.id); related.add(edge.from); related.add(edge.to); }
+    const dim = 1 - .62 * focus, nodeAlpha = (node: FlowNode) => !focus || related.has(node.id) || node.id === hover?.id ? 1 : node.kind === 'frame' ? 1 - .35 * focus : dim;
+    const textShown = (node: FlowNode) => node.id !== state.editing && node.fontSize * zoom >= 5;
+    const paint = (node: FlowNode, bitmap?: Bitmap, failed = false) => { ctx.save(); ctx.globalAlpha = nodeAlpha(node); drawNode(ctx, node, bitmap, failed, textShown(node), effects(node), pixelScale, false, simplified); ctx.restore(); };
+    for (const node of visibleNodes) if (node.kind === 'frame') paint(node);
     const paths=new Map(doc.edges.map(e=>[e.id,edgePoints(e,doc,nodeIndex)]));
     ctx.font=EDGE_LABEL_FONT;const labels=layoutEdgeLabels(doc,paths,t=>ctx.measureText(t).width);
     this.blockedEdges = [];
+    const emphasized: Array<[FlowEdge, Point[], EdgeLabel | undefined]> = [];
     for (const edge of doc.edges) {
       const points = paths.get(edge.id)!;
       if (!points.length) this.blockedEdges.push(edge.id);
@@ -512,14 +541,24 @@ export class Renderer {
         }
         const label = labels.get(edge.id);
         if ((left - 60 <= visible.x + visible.w && right + 60 >= visible.x && top - 60 <= visible.y + visible.h && bottom + 60 >= visible.y) ||
-          (label && intersects(label.box, visible))) drawEdge(ctx, edge, simplified ? points : visualEdgePoints(points,edge,nodeIndex), state.edgeSelection === edge.id, zoom, label);
+          (label && intersects(label.box, visible))) {
+          const near = relatedEdges.has(edge.id);
+          if (near && focus) { emphasized.push([edge, points, label]); continue; }
+          ctx.save(); ctx.globalAlpha = focus ? dim : 1;
+          drawEdge(ctx, edge, simplified ? points : visualEdgePoints(points,edge,nodeIndex), state.edgeSelection === edge.id, zoom, label);
+          ctx.restore();
+        }
       }
     }
+    // Connections of the hovered box are drawn last, slightly heavier, above faded lines.
+    for (const [edge, points, label] of emphasized) drawEdge(ctx, { ...edge, width: edge.width + .6 * focus }, simplified ? points : visualEdgePoints(points,edge,nodeIndex), state.edgeSelection === edge.id, zoom, label);
     for (const node of visibleNodes) {
       if (node.kind === 'frame') continue;
       const cached = node.kind === 'image' && node.assetId ? this.images.get(node.assetId) : undefined;
-      drawNode(ctx, node, cached?.bitmap, Boolean(cached?.failed), node.fontSize * zoom >= 5, effects(node), pixelScale, false, simplified);
+      paint(node, cached?.bitmap, Boolean(cached?.failed));
     }
+    if (hover && !state.selection.has(hover.id)) focusRing(ctx, hover, zoom, rich, pixelScale, 1, true);
+    if (focus) for (const id of related) { const node = nodeIndex.get(id); if (node && id !== hover?.id && !state.selection.has(id)) focusRing(ctx, node, zoom, rich, pixelScale, focus, false); }
     const activeEdge=doc.edges.find(e=>e.id===state.edgeSelection);
     if(activeEdge?.style==='elbow'){
       const points=edgePoints(activeEdge,doc,nodeIndex);

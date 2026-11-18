@@ -136,7 +136,8 @@ button, summary, input, textarea, select { transition: none; }
 .status-dot { display: inline-block; width: 5px; height: 5px; flex-shrink: 0; border-radius: 50%; background: var(--muted); }
 .canvas-fit { pointer-events: auto; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--panel); min-height: 32px; border-radius: 6px; padding: 0 10px; font-size: 12px; color: var(--muted); }
 .canvas-fit:hover { background: var(--surface); }
-#text-editor { position: absolute; z-index: 8; padding: 8px; margin: 0; color: var(--ink); background: var(--panel); border: 1.5px solid var(--accent-text); border-radius: 4px; resize: none; line-height: 1.4; overflow: auto; box-sizing: border-box; }
+#text-editor { position: absolute; z-index: 8; padding: 0; margin: 0; color: var(--ink); background: transparent; border: 0; border-radius: 0; resize: none; line-height: 1.45; overflow: hidden; box-sizing: border-box; font-kerning: normal; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; }
+#text-editor::selection { background: var(--edit-selection, rgba(247,107,21,.22)); }
 #text-editor:focus { outline: none; }
 #drop-overlay { position: absolute; inset: 18px; z-index: 40; background: var(--accent-soft); border: 2px dashed var(--accent); border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; color: var(--accent-text); pointer-events: none; }
 #drop-overlay strong { color: var(--ink); font-size: 22px; font-weight: 650; }

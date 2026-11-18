@@ -48,4 +48,6 @@ export interface RenderState {
   grid: boolean; marquee?: Box; connection?: { from: Point; to: Point };
   guides?: { axis: 'x' | 'y'; value: number }[];
   remote?: Set<string>;
+  /** Live canvas only: hovered node, focus fade 0–1, node whose text is in the editor. */
+  hover?: string | null; focus?: number; editing?: string | null;
 }

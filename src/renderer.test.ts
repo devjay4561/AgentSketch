@@ -112,15 +112,19 @@ test('a short text heading keeps its first line inside the canvas clip and match
   renderer.render({ doc, selection: new Set(), edgeSelection: null, grid: false });
   assert.equal(lines.length, 1);
   assert.equal(lines[0].text, heading.text);
+  // Canvas draws on the alphabetic baseline (snapped to device pixels in the app);
+  // without font metrics the line middle sits .35em above it.
+  const middle = lines[0].y - heading.fontSize * .35;
   // The actual clipping rectangle must contain the full nominal glyph height.
-  assert.ok(lines[0].y - heading.fontSize / 2 >= lines[0].clip.y);
-  assert.ok(lines[0].y + heading.fontSize / 2 <= lines[0].clip.y + lines[0].clip.h);
+  assert.ok(middle - heading.fontSize / 2 >= lines[0].clip.y);
+  assert.ok(middle + heading.fontSize / 2 <= lines[0].clip.y + lines[0].clip.h);
   const svgY = Number(renderSVG(doc).match(/<tspan x="[^"]+" y="([^"]+)"/)?.[1]);
-  assert.equal(svgY, lines[0].y);
+  assert.ok(Math.abs(svgY - middle) < 1e-9);
   assert.deepEqual({ x: heading.x, y: heading.y, w: heading.w, h: heading.h }, geometryBefore);
 });
 
-test('wrapping keeps English words whole, Hangul per character, and never hides text', () => {
+test('wrapping keeps English and Korean words whole, breaks oversized words, and never hides text', () => {
+  assert.deepEqual(lineSegments('수동 점검 추가', 6, (s: string) => [...s].length), ['수동 점검', '추가']);
   const mono = (s: string) => [...s].length;
   assert.deepEqual(lineSegments('screen mockups final', 10, mono), ['screen', 'mockups', 'final']);
   assert.deepEqual(lineSegments('가나다라마바', 4, mono), ['가나다라', '마바']);

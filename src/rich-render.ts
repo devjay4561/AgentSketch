@@ -12,7 +12,8 @@ const escape=(s:string)=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const safeLink=(href?:string)=>{if(!href)return undefined;try{const url=new URL(href);return ['https:','http:','mailto:'].includes(url.protocol)?href:undefined;}catch{return undefined;}};
 const font=(size:number,bold:boolean,family:string)=>`${bold?600:400} ${size}px ${family}`;
 /** Latin words (with attached digits and punctuation) wrap whole; Hangul and other text wraps per character. */
-export const WRAP_TOKENS=/[\p{Script=Latin}\d'’\-_.,:;!?()/&%+#@=]+|\s|./gsu;
+// Korean wraps at spaces (keep-all), like Latin words; a word wider than the box still breaks per character.
+export const WRAP_TOKENS=/[\p{Script=Latin}\p{Script=Hangul}\d'’\-_.,:;!?()/&%+#@=~·]+|\s|./gsu;
 const fallbackMeasure:Measure=(text,size)=>[...text].reduce((n,c)=>n+size*(c.charCodeAt(0)>255?1:.55),0);
 
 /** Whole text is retained in this layout; the caller chooses the visible node box. */

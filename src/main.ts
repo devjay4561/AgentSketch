@@ -17,7 +17,7 @@ import type { Asset, Box, FlowDocument, FlowEdge, FlowNode, Point, Port, RenderS
 import { History, cloneDocument, createNode, emptyDocument, uid, duplicateSelection, removeSelection, alignNodes, distributeNodes, autoLayout, validateDocument, translateInternalRoutes } from './model.ts';
 import { bounds, contains, intersects, portPoint, edgePoints, distanceToSegment, prepareRoutes, routeHandles } from './geometry.ts';
 import { createSample } from './sample.ts';
-import { Renderer, drawMinimap } from './renderer.ts';
+import { Renderer, drawMinimap, textBox } from './renderer.ts';
 import { isNative, openDocument, saveDocument, autosave, loadAutosave, exportFile, importImages } from './persistence.ts';
 import { icon } from './icons.ts';
 import { FONT_FAMILY, PALETTE } from './theme.ts';
@@ -106,7 +106,7 @@ function invalidate() {
     const startNode = connecting ? doc.nodes.find(n => n.id === connecting!.node) : undefined;
     if (connecting && !startNode) connecting = null;
     const view=projectVisibleDocument(doc);
-    renderer.render({ doc:view, selection: selected, edgeSelection: selectedEdge, grid, marquee, guides, remote: aiChanged, connection: reconnecting ?? (connecting && startNode ? { from: portPoint(startNode, connecting.port), to: connecting.to } : undefined) });
+    renderer.render({ doc:view, selection: selected, edgeSelection: selectedEdge, grid, marquee, guides, remote: aiChanged, hover: hoverId, focus: focusAmount, editing, connection: reconnecting ?? (connecting && startNode ? { from: portPoint(startNode, connecting.port), to: connecting.to } : undefined) });
     const warning = $('route-warning');
     warning.hidden = renderer.blockedEdges.length === 0;
     warning.textContent = `경로 없음 ${renderer.blockedEdges.length}개 · 확인`;
@@ -152,6 +152,39 @@ function aiCommit(next: FlowDocument) {
 }
 function selectedNodes() { return doc.nodes.filter(n => selected.has(n.id)); }
 function editableNodes() { const ids=editableNodeIds(doc);return selectedNodes().filter(n => ids.has(n.id)); }
+// Hover focus. The fade is a bounded tween that stops at its target; no idle frames.
+let hoverId: string | null = null, focusAmount = 0, focusTarget = 0, focusFrame = 0;
+let focusTimer: ReturnType<typeof setTimeout> | undefined;
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+function animateFocus() {
+  if (reducedMotion.matches) { focusAmount = focusTarget; invalidate(); return; }
+  if (focusFrame) return;
+  let last = performance.now();
+  const step = (now: number) => {
+    const delta = (now - last) / 160; last = now;
+    focusAmount = focusTarget > focusAmount ? Math.min(focusTarget, focusAmount + delta) : Math.max(focusTarget, focusAmount - delta);
+    invalidate();
+    focusFrame = focusAmount === focusTarget ? 0 : requestAnimationFrame(step);
+  };
+  focusFrame = requestAnimationFrame(step);
+}
+function setHover(id: string | null) {
+  if (id === hoverId) return;
+  clearTimeout(focusTimer);
+  const connected = !!id && doc.edges.some(e => e.from === id || e.to === id);
+  const wasFocused = focusTarget > 0;
+  hoverId = id; invalidate();
+  if (!connected) {
+    // Leaving a box: wait briefly so crossing the gap to a neighbour does not flash.
+    focusTimer = setTimeout(() => { focusTarget = 0; animateFocus(); }, id ? 0 : 90);
+  } else if (wasFocused) { focusTarget = 1; animateFocus(); }
+  else focusTimer = setTimeout(() => { focusTarget = 1; animateFocus(); }, 220);
+}
+function hoverTarget(p: Point): string | null {
+  if (currentTool !== 'select' || space || editing || gesture || connecting) return null;
+  const n = hitNode(p);
+  return n && n.kind !== 'frame' && n.kind !== 'text' && n.kind !== 'draw' ? n.id : null;
+}
 function select(ids: Iterable<string>, edge: string | null = null) { selected = new Set(ids); selectedEdge = edge; updateUI(); invalidate(); }
 function expandGroup(n: FlowNode): string[] { return n.groupId ? groupMembers(doc,topGroupId(doc,n.groupId)).map(m => m.id) : [n.id]; }
 function hitNode(p: Point): FlowNode | undefined {
@@ -211,6 +244,7 @@ function attach(from: string, to: string, fromPort: Port, toPort: Port) {
 }
 
 canvas.addEventListener('pointerdown', e => {
+  setHover(null);
   if (e.button === 2) return;
   finishEdit(); $('context-menu').hidden = true; canvas.focus();
   const p = worldPoint(e), s = screenPoint(e); cursor = p;
@@ -276,6 +310,7 @@ canvas.addEventListener('pointermove', e => {
   const p = worldPoint(e), s = screenPoint(e); cursor = p;
   if (connecting) { connecting.to = p; invalidate(); }
   if (!gesture) {
+    setHover(hoverTarget(p));
     if (currentTool === 'select' && !space) { const h = resizeCorner(p); canvas.style.cursor = h ? (h.corner % 2 ? 'nesw-resize' : 'nwse-resize') : hitPort(p) ? 'crosshair' : hitNode(p) ? 'move' : 'default'; }
     return;
   }
@@ -373,6 +408,7 @@ function endGesture(e: PointerEvent, canceled = false) {
   guides = undefined; canvas.style.cursor = currentTool === 'hand' || space ? 'grab' : currentTool === 'select' ? 'default' : 'crosshair'; invalidate();
 }
 canvas.addEventListener('pointerup', e => endGesture(e));
+canvas.addEventListener('pointerleave', () => setHover(null));
 canvas.addEventListener('pointercancel', e => endGesture(e, true));
 canvas.addEventListener('wheel', e => {
   e.preventDefault(); finishEdit();
@@ -403,18 +439,35 @@ async function addDocumentCard(reconnect=false){
     if(!target){node.w=260;node.h=110;node.fill='#FFF0E5';node.stroke='#C2410C';node.text=`문서 · ${linked.title}\n더블클릭하여 상세 문서 열기`;node.details.pageId=doc.workspace?.activePageId??DEFAULT_PAGE;doc.nodes.push(node);select([node.id]);}
   },target?'문서 연결을 바꿨습니다.':'문서 카드를 추가했습니다. 더블클릭하면 새 탭으로 열립니다.');
 }
-function beginEdit(n: FlowNode) { if(!editableNodeIds(doc).has(n.id))return; finishEdit(); select([n.id]); editing = n.id; textEditor.value = n.text; textEditor.hidden = false; positionEditor(); textEditor.focus(); textEditor.select(); }
+function beginEdit(n: FlowNode) { if(!editableNodeIds(doc).has(n.id))return; finishEdit(); select([n.id]); editing = n.id; setHover(null); textEditor.value = n.text; textEditor.hidden = false; positionEditor(); invalidate(); textEditor.focus(); textEditor.select(); }
 function positionEditor() {
   if (!editing) return; const n = doc.nodes.find(n => n.id === editing); if (!n) return;
-  const v = doc.viewport;
-  Object.assign(textEditor.style, { left: `${n.x * v.zoom + v.x}px`, top: `${n.y * v.zoom + v.y}px`, width: `${Math.max(100, n.w * v.zoom)}px`, height: `${Math.max(52, n.h * v.zoom)}px`, fontFamily: FONT_FAMILY, fontSize: `${Math.max(11, n.fontSize * v.zoom)}px`, fontWeight: n.bold ? '700' : '400', textAlign: n.align, color: n.color, background: n.kind === 'image' || n.fill === 'transparent' ? '#ffffff' : n.fill, padding: `${12 * v.zoom}px` });
+  // The editor sits exactly on the canvas text box with the canvas typography, so
+  // entering and leaving edit mode does not move, resize or re-weight the text.
+  const v = doc.viewport, z = v.zoom, box = textBox(n), size = (n.kind === 'frame' ? Math.min(18, n.fontSize) : n.fontSize) * z;
+  const light = /^#([\da-f]{6})/i.exec(n.color), rgb = light ? parseInt(light[1], 16) : 0;
+  const luminance = ((rgb >> 16) * .299 + (rgb >> 8 & 255) * .587 + (rgb & 255) * .114) / 255;
+  Object.assign(textEditor.style, {
+    left: `${box.x * z + v.x}px`, top: `${box.y * z + v.y}px`, width: `${Math.max(40, box.w * z)}px`, height: `${Math.max(size * 1.45, box.h * z)}px`,
+    fontFamily: FONT_FAMILY, fontSize: `${size}px`, fontWeight: n.bold ? '600' : '500', lineHeight: '1.45',
+    textAlign: n.kind === 'frame' ? 'left' : n.align, color: n.color, caretColor: n.color, background: 'transparent', padding: '0',
+  });
+  textEditor.style.setProperty('--edit-selection', luminance > .6 ? 'rgba(255,255,255,.32)' : 'rgba(247,107,21,.22)');
+  centerEditorText(n);
+}
+function centerEditorText(n: FlowNode) {
+  if (n.kind === 'note' || n.kind === 'text' || n.kind === 'frame') { textEditor.style.paddingTop = '0'; return; }
+  textEditor.style.paddingTop = '0';
+  const free = textEditor.clientHeight - textEditor.scrollHeight;
+  textEditor.style.paddingTop = `${Math.max(0, free / 2)}px`;
 }
 function finishEdit(cancel = false) {
   if (!editing) return;
-  const n = doc.nodes.find(n => n.id === editing), value = textEditor.value; editing = null; textEditor.hidden = true;
+  const n = doc.nodes.find(n => n.id === editing), value = textEditor.value; editing = null; textEditor.hidden = true; invalidate();
   if (!cancel && n && n.text !== value) { history.push(doc); setNodePlainText(n,value.slice(0,20000)); changed(); }
 }
 textEditor.addEventListener('blur', () => finishEdit());
+textEditor.addEventListener('input', () => { const n = doc.nodes.find(n => n.id === editing); if (n) centerEditorText(n); });
 textEditor.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); finishEdit(true); canvas.focus(); } else if (e.key.toLowerCase() === 's' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void action(e.shiftKey ? 'save-as' : 'save'); } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); finishEdit(); canvas.focus(); } e.stopPropagation(); });
 
 function updateUI() {
