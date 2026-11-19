@@ -30,9 +30,10 @@ try {
   await page.locator('[data-tool=select]').click();await key('Control+f');
   check(await page.locator('#search-input').evaluate(el=>document.activeElement===el),'Ctrl+F opens layers and focuses search');
   await page.locator('[data-tab=properties]').click();await key('Tab');check(await page.locator('#app').evaluate(el=>el.classList.contains('focus-mode')),'canvas Tab expands workspace');
-  await key('Tab');await key('Control+n');await page.getByRole('button',{name:'저장하지 않고 계속'}).click();
+  const tabCount=await page.locator('#document-tabs [role=tab]').count();await key('Tab');await key('Control+n');
   await page.waitForFunction(()=>document.querySelector('#node-count').textContent.startsWith('0개'));
   check(await page.locator('[data-action=undo]').isDisabled(),'new document clears undo across file boundary');
+  check(await page.locator('#document-tabs [role=tab]').count()===tabCount+1,'Ctrl+N opens a new tab and keeps the current board');
   check(errors.length===0,'regressions have no runtime errors');
   await writeFile('output/editor-regressions.json',JSON.stringify({checks,errors},null,2));console.log(JSON.stringify({checks,errors},null,2));
 }finally{await browser.close();}

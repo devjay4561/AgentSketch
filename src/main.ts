@@ -637,7 +637,9 @@ async function confirmChoice(title: string, message: string, options: { label: s
   document.body.append(dialog); dialog.showModal(); return await new Promise(resolve => dialog.addEventListener('close', () => { const result = dialog.returnValue || 'cancel'; dialog.remove(); resolve(result); }, { once: true }));
 }
 async function save(saveAs: boolean): Promise<boolean> {
-  finishEdit(); try { const savedRevision = revision, path = await saveDocument(doc, filePath, saveAs); if (path === null) return false; filePath = path; if (revision === savedRevision) dirty = false; setStatus('파일로 저장했습니다');updateUI(); toast('보드를 파일로 저장했습니다.'); return true; } catch (error) { toast(`저장하지 못했습니다. ${String(error)}`, true); return false; }
+  finishEdit(); try { const savedRevision = revision, untitled = [t('이름 없는 보드'), '이름 없는 보드', 'Untitled board'].includes(doc.title), path = await saveDocument(doc, filePath, saveAs); if (path === null) return false; filePath = path;
+    // An untitled board takes the name the user just typed in the save dialog.
+    if (untitled) { const name = path.split(/[\\/]/).pop()!.replace(/\.(agentsketch|flowpaper|json)$/i, '').trim(); if (name && name !== doc.title) { doc.title = name.slice(0, 200); await saveDocument(doc, path, false); } } if (revision === savedRevision) dirty = false; setStatus('파일로 저장했습니다');updateUI(); toast('보드를 파일로 저장했습니다.'); return true; } catch (error) { toast(`저장하지 못했습니다. ${String(error)}`, true); return false; }
 }
 function replaceDocument(next: FlowDocument, path = '') {
   const bridge=(window as any).go?.main?.App;
@@ -669,7 +671,7 @@ async function runAction(action: string) {
     case 'relink-document': await addDocumentCard(true); break;
     case 'open-linked-document': if(selectedNodes()[0])await openLinkedCard(selectedNodes()[0]); break;
     case 'unlink-document': {const n=selectedNodes()[0];if(n&&editableNodeIds(doc).has(n.id))mutate(()=>{delete n.details?.documentPath;},'문서 연결을 해제했습니다. 원본 파일은 유지됩니다.');break;}
-    case 'new': if (await guardReplace()) { replaceDocument(emptyDocument()); fit(); toast('빈 보드를 만들었습니다. 왼쪽 도구로 시작하세요.'); } break;
+    case 'new': if (tabs) { if (await tabs.create()) { fit(); toast('빈 보드를 새 탭에 만들었습니다.'); } } else if (await guardReplace()) { replaceDocument(emptyDocument()); fit(); toast('빈 보드를 만들었습니다. 왼쪽 도구로 시작하세요.'); } break;
     case 'open': if (await guardReplace()) { const result = await openDocument(); if (result) replaceDocument(result.doc, result.path); } break;
     case 'save': await save(false); break;
     case 'save-as': await save(true); break;

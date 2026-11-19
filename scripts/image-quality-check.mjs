@@ -14,7 +14,7 @@ try {
   await page.goto(process.env.AGENTSKETCH_TEST_URL ?? 'http://127.0.0.1:18442');
   await page.locator('#board').focus();
   await page.keyboard.press('Control+n');
-  await page.getByText('빈 보드를 만들었습니다.', { exact: false }).waitFor();
+  await page.getByText('빈 보드를', { exact: false }).waitFor();
   const original = await page.evaluate(async () => {
     const rendererUrl = performance.getEntriesByType('resource').find(entry => new URL(entry.name).pathname === '/src/renderer.ts').name;
     const { Renderer } = await import(rendererUrl);

@@ -116,14 +116,15 @@ export function mountDocumentTabs(host:TabsHost,container:HTMLElement) {
     }catch(error){report(error);return false;}finally{busy=false;render();}
   }
   async function newTab(){
-    if(busy||!ready||tabs.length>=MAX_TABS||blocked)return;
+    if(ready&&tabs.length>=MAX_TABS){host.toast(t('문서는 최대 5개 탭까지 열 수 있습니다. 사용하지 않는 탭을 닫으세요.'),true);return false;}
+    if(busy||!ready||blocked)return false;
     busy=true;render();
     try{
       host.commitEditing?.();
       await flush();const previous=tabs.find(t=>t.id===activeId)!,next=emptyDocument();
-      const accepted=host.restoreTab?await host.restoreTab(next,'',false):await host.replaceDocument(next,'');if(accepted===false)return;
-      previous.document=undefined;activeId=uid();dirtyFallback=false;host.setDirty?.(false);tabs.push({id:activeId,title:next.title,path:'',dirty:false,bytes:byteSize(next),identity:identity(next),document:host.getDocument()});revision++;await flush();
-    }catch(error){report(error);}finally{busy=false;render();}
+      const accepted=host.restoreTab?await host.restoreTab(next,'',false):await host.replaceDocument(next,'');if(accepted===false)return false;
+      previous.document=undefined;activeId=uid();dirtyFallback=false;host.setDirty?.(false);tabs.push({id:activeId,title:next.title,path:'',dirty:false,bytes:byteSize(next),identity:identity(next),document:host.getDocument()});revision++;await flush();return true;
+    }catch(error){report(error);return false;}finally{busy=false;render();}
   }
   async function closeTab(id:string){
     if(busy||!ready||blocked)return;const target=tabs.find(t=>t.id===id);if(!target)return;
@@ -171,7 +172,7 @@ export function mountDocumentTabs(host:TabsHost,container:HTMLElement) {
     update,
     async list(){await initialization;capture();return {activeId,tabs:tabs.map(({document:_document,...t})=>({...t}))};},
     async activate(id:string){await initialization;return switchTo(id);},
-    async create(){await initialization;await newTab();},
+    async create(){await initialization;return newTab();},
     async closeSaved(id:string){await initialization;capture();const tab=tabs.find(t=>t.id===id);if(!tab)throw new Error('탭이 없습니다.');if(tab.dirty)throw new Error('미저장 탭은 먼저 파일로 저장하세요.');await closeTab(id);},
     async openLinked(path:string,load:()=>Promise<FlowDocument>){
       await initialization;
