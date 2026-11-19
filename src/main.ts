@@ -443,10 +443,27 @@ async function addDocumentCard(reconnect=false){
   const result=await api.OpenDocument();if(!result||doc!==origin)return;
   if(!/\.(agentsketch|flowpaper)$/i.test(result.path))throw new Error('.agentsketch 파일을 선택하세요.');
   const linked=validateDocument(JSON.parse(result.data));
-  mutate(()=>{const node=target??createNode('round',(canvas.clientWidth/2-doc.viewport.x)/doc.viewport.zoom-130,(canvas.clientHeight/2-doc.viewport.y)/doc.viewport.zoom-55);
-    node.details={...node.details,documentPath:result.path};
-    if(!target){node.w=260;node.h=110;node.fill='#FFF0E5';node.stroke='#C2410C';node.text=`문서 · ${linked.title}\n더블클릭하여 상세 문서 열기`;node.details.pageId=doc.workspace?.activePageId??DEFAULT_PAGE;doc.nodes.push(node);select([node.id]);}
-  },target?'문서 연결을 바꿨습니다.':'문서 카드를 추가했습니다. 더블클릭하면 새 탭으로 열립니다.');
+  linkCard(target,result.path,linked.title,target?'문서 연결을 바꿨습니다.':'문서 카드를 추가했습니다. 더블클릭하면 새 탭으로 열립니다.');
+}
+function linkCard(target:FlowNode|undefined,path:string,title:string,message:string):FlowNode{
+  let node=target!;
+  mutate(()=>{node=target??createNode('round',(canvas.clientWidth/2-doc.viewport.x)/doc.viewport.zoom-130,(canvas.clientHeight/2-doc.viewport.y)/doc.viewport.zoom-55);
+    node.details={...node.details,documentPath:path};
+    if(!target){node.w=260;node.h=110;node.fill='#FFF0E5';node.stroke='#C2410C';node.text=`문서 · ${title}\n더블클릭하여 상세 문서 열기`;node.details.pageId=doc.workspace?.activePageId??DEFAULT_PAGE;doc.nodes.push(node);select([node.id]);}
+  },message);
+  return node;
+}
+/** Ctrl+Shift+N: save a new empty board next to this file and link it to the selected box (or a new card). */
+async function newLinkedDocument(){
+  const api=(window as any).go?.main?.App;
+  if(!api?.CreateLinkedDocument){toast('새 연결 문서는 Windows 실행 파일에서 만들 수 있습니다.',true);return;}
+  finishEdit();
+  const picked=selectedNodes(),target=picked.length===1&&editableNodeIds(doc).has(picked[0].id)?picked[0]:undefined;
+  const title=target?.text.split('\n').map(l=>l.trim()).find(Boolean)||'새 문서',origin=doc;
+  const next=emptyDocument();next.title=title;
+  const path=await api.CreateLinkedDocument(JSON.stringify(next),filePath);if(!path||doc!==origin)return;
+  const node=linkCard(target,path,title,'새 문서를 만들어 연결했습니다.');
+  await openLinkedCard(node);
 }
 function beginEdit(n: FlowNode) { if(!editableNodeIds(doc).has(n.id))return; finishEdit(); select([n.id]); editing = n.id; setHover(null); textEditor.value = n.text; textEditor.hidden = false; positionEditor(); invalidate(); textEditor.focus(); textEditor.select(); }
 function positionEditor() {
@@ -648,6 +665,7 @@ async function runAction(action: string) {
     case 'ai-follow': {aiFollow=!aiFollow;localStorage.setItem('agentsketch.ai-follow',aiFollow?'1':'0');document.querySelector('[data-action="ai-follow"]')?.setAttribute('aria-pressed',String(aiFollow));break;}
     case 'automation': {await (window as any).go?.main?.App?.DisableAutomation();break;}
     case 'document-card': await addDocumentCard(); break;
+    case 'new-linked-document': await newLinkedDocument(); break;
     case 'relink-document': await addDocumentCard(true); break;
     case 'open-linked-document': if(selectedNodes()[0])await openLinkedCard(selectedNodes()[0]); break;
     case 'unlink-document': {const n=selectedNodes()[0];if(n&&editableNodeIds(doc).has(n.id))mutate(()=>{delete n.details?.documentPath;},'문서 연결을 해제했습니다. 원본 파일은 유지됩니다.');break;}
@@ -706,7 +724,7 @@ async function runAction(action: string) {
   }
 }
 async function action(name: string) {
-  const long = ['document-card','relink-document','open-linked-document','new', 'open', 'save', 'save-as', 'template-launch', 'template-simple', 'export-png', 'export-svg', 'export-pdf', 'export-html', 'graphics-gpu'].includes(name);
+  const long = ['document-card','new-linked-document','relink-document','open-linked-document','new', 'open', 'save', 'save-as', 'template-launch', 'template-simple', 'export-png', 'export-svg', 'export-pdf', 'export-html', 'graphics-gpu'].includes(name);
   if (long && operationBusy) return;
   if (long) operationBusy = true;
   try { await runAction(name); } catch (error) { toast(`작업을 완료하지 못했습니다. ${String(error)}`, true); } finally { if (long) operationBusy = false; }
@@ -738,7 +756,7 @@ canvas.addEventListener('contextmenu', e => {
   e.preventDefault(); finishEdit(); const p = worldPoint(e), n = hitNode(p), edge = n ? undefined : hitEdge(p);
   if (n && !selected.has(n.id)) select(expandGroup(n)); else if (edge) select([], edge.id);
   const menu = $('context-menu');
-  const entries = n || selected.size ? [['next-step', '다음 단계 추가', ''], ['duplicate', '복제', 'Ctrl+D'], ['copy', '복사', 'Ctrl+C'], ['group', '묶기', 'Ctrl+G'], ['ungroup', '묶기 해제', 'Ctrl+Shift+G'], ['front', '맨 앞으로', ']'], ['back', '맨 뒤로', '['], ['lock', selectedNodes().every(n => n.locked) ? '잠금 해제' : '잠금', 'Ctrl+L'], ['fit-selection', '선택 요소로 이동', 'Shift+1'], ['delete', '삭제', 'Delete']] : edge ? [['delete', '연결선 삭제', 'Delete']] : [['paste', '붙여넣기', 'Ctrl+V'], ['fit', '전체 보기', '1'], ['tidy-board', '보드 다듬기', ''], ['image', '이미지 추가', ''], ['help', '단축키 보기', '?']];
+  const entries = n || selected.size ? [['next-step', '다음 단계 추가', ''], ['new-linked-document', '새 연결 문서', 'Ctrl+Shift+N'], ['duplicate', '복제', 'Ctrl+D'], ['copy', '복사', 'Ctrl+C'], ['group', '묶기', 'Ctrl+G'], ['ungroup', '묶기 해제', 'Ctrl+Shift+G'], ['front', '맨 앞으로', ']'], ['back', '맨 뒤로', '['], ['lock', selectedNodes().every(n => n.locked) ? '잠금 해제' : '잠금', 'Ctrl+L'], ['fit-selection', '선택 요소로 이동', 'Shift+1'], ['delete', '삭제', 'Delete']] : edge ? [['delete', '연결선 삭제', 'Delete']] : [['paste', '붙여넣기', 'Ctrl+V'], ['fit', '전체 보기', '1'], ['tidy-board', '보드 다듬기', ''], ['image', '이미지 추가', ''], ['help', '단축키 보기', '?']];
   if(n?.details?.documentPath)entries.unshift(['open-linked-document','연결 문서 열기','Enter'],['relink-document','문서 다시 연결',''],['unlink-document','문서 연결 해제','']);
   menu.innerHTML = entries.map(([a, text, key]) => `<button data-action="${a}"><span>${text}</span><kbd>${key}</kbd></button>`).join('');
   menu.hidden = false; menu.style.left = `${Math.min(e.clientX, window.innerWidth - 236)}px`; menu.style.top = `${Math.max(8, Math.min(e.clientY, window.innerHeight - menu.offsetHeight - 12))}px`;
@@ -752,7 +770,7 @@ document.addEventListener('keydown', e => {
   if (isTyping(e.target)) { if (modifier && e.key.toLowerCase() === 's') { e.preventDefault(); void action(e.shiftKey ? 'save-as' : 'save'); } return; }
   if (modifier) {
     const key = e.key.toLowerCase();
-    const shortcuts: Record<string, string> = { s: e.shiftKey ? 'save-as' : 'save', o: 'open', n: 'new', z: e.shiftKey ? 'redo' : 'undo', y: 'redo', d: 'duplicate', g: e.shiftKey ? 'ungroup' : 'group', l: 'lock', f: 'search', '0': 'fit', '[': 'back', ']': 'front' };
+    const shortcuts: Record<string, string> = { s: e.shiftKey ? 'save-as' : 'save', o: 'open', n: e.shiftKey ? 'new-linked-document' : 'new', z: e.shiftKey ? 'redo' : 'undo', y: 'redo', d: 'duplicate', g: e.shiftKey ? 'ungroup' : 'group', l: 'lock', f: 'search', '0': 'fit', '[': 'back', ']': 'front' };
     if (key === 'i' && e.shiftKey) { e.preventDefault(); pickImages(); return; }
     if (shortcuts[key]) { e.preventDefault(); void action(shortcuts[key]); return; }
     if (key === 'a') { e.preventDefault(); select(projectVisibleDocument(doc).nodes.map(n => n.id)); return; }
