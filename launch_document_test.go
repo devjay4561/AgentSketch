@@ -4,6 +4,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -17,7 +18,7 @@ func TestLaunchDocumentOnlyReadsFirstExistingAgentSketch(t *testing.T) {
 	if selected != path {
 		t.Fatal(selected)
 	}
-	app := &App{store: NewStore(filepath.Join(dir, "recovery.agentsketch")), documents: NewDocumentLibrary(filepath.Join(dir, "library")), launchPath: selected}
+	app := &App{store: NewStore(filepath.Join(dir, "recovery.agentsketch")), documents: NewDocumentLibrary(filepath.Join(dir, "library")), launchPaths: []string{selected}}
 	result, err := app.TakeLaunchDocument()
 	if err != nil || result.Path != path || result.Data != string(testDocument("선행 자료")) {
 		t.Fatal(result, err)
@@ -28,6 +29,29 @@ func TestLaunchDocumentOnlyReadsFirstExistingAgentSketch(t *testing.T) {
 	result, err = app.TakeLaunchDocument()
 	if err != nil || result != nil {
 		t.Fatal("launch request was not consumed", result, err)
+	}
+}
+
+func TestFinderOpenQueuesDocumentsInOrder(t *testing.T) {
+	dir := t.TempDir()
+	paths := []string{filepath.Join(dir, "first.agentsketch"), filepath.Join(dir, "second.flowpaper")}
+	for i, path := range paths {
+		if err := os.WriteFile(path, testDocument(string(rune('A'+i))), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	app := &App{store: NewStore(filepath.Join(dir, "recovery.agentsketch")), documents: NewDocumentLibrary(filepath.Join(dir, "library"))}
+	for _, path := range paths {
+		app.openFinderDocument(path)
+	}
+	for _, path := range paths {
+		result, err := app.TakeLaunchDocument()
+		if err != nil || result == nil || result.Path != path {
+			t.Fatalf("result=%+v err=%v, want %s", result, err, path)
+		}
+	}
+	if result, err := app.TakeLaunchDocument(); err != nil || result != nil {
+		t.Fatalf("queue should be empty: result=%+v err=%v", result, err)
 	}
 }
 func TestSecondInstanceQueuesWithoutChangingRecoveryAndRejectsBadFile(t *testing.T) {
@@ -69,8 +93,17 @@ func TestLegacyFlowPaperDocumentStillOpens(t *testing.T) {
 
 func TestLegacyProfileMovesOnceAndKeepsRecovery(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("AppData", dir)
-	old := filepath.Join(dir, "FlowPaper")
+	profileRoot := dir
+	switch runtime.GOOS {
+	case "windows":
+		t.Setenv("AppData", dir)
+	case "darwin":
+		t.Setenv("HOME", dir)
+		profileRoot = filepath.Join(dir, "Library", "Application Support")
+	default:
+		t.Setenv("XDG_CONFIG_HOME", dir)
+	}
+	old := filepath.Join(profileRoot, "FlowPaper")
 	if err := os.MkdirAll(filepath.Join(old, "library"), 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -78,10 +111,10 @@ func TestLegacyProfileMovesOnceAndKeepsRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	migrateLegacyProfile()
-	if got, err := os.ReadFile(filepath.Join(dir, "AgentSketch", "recovery.agentsketch")); err != nil || string(got) != string(testDocument("복구")) {
+	if got, err := os.ReadFile(filepath.Join(profileRoot, "AgentSketch", "recovery.agentsketch")); err != nil || string(got) != string(testDocument("복구")) {
 		t.Fatal(string(got), err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "AgentSketch", "library")); err != nil {
+	if _, err := os.Stat(filepath.Join(profileRoot, "AgentSketch", "library")); err != nil {
 		t.Fatal(err)
 	}
 	// A second old folder appearing later must not overwrite the migrated profile.

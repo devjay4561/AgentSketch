@@ -33,7 +33,7 @@ type App struct {
 	settingsPath        string
 	graphics            GraphicsSettings
 	launchMu            sync.Mutex
-	launchPath          string
+	launchPaths         []string
 	english             atomic.Bool
 }
 
@@ -58,12 +58,15 @@ func NewApp() *App {
 	}
 	workingDirectory, _ := os.Getwd()
 	settingsPath := userSettingsPath()
-	return &App{
+	app := &App{
 		store: NewStore(recovery), documents: NewDocumentLibrary(library),
-		launchPath:   launchDocumentPath(os.Args[1:], workingDirectory),
 		settingsPath: settingsPath,
 		graphics:     resolveGraphicsSettings(loadGPUSetting(settingsPath), os.Getenv("AGENTSKETCH_ENABLE_GPU")),
 	}
+	if path := launchDocumentPath(os.Args[1:], workingDirectory); path != "" {
+		app.launchPaths = append(app.launchPaths, path)
+	}
+	return app
 }
 
 func (a *App) GetGraphicsSettings() GraphicsSettings {
@@ -107,16 +110,33 @@ func (a *App) secondInstance(data options.SecondInstanceData) {
 	}
 	path := launchDocumentPath(data.Args, data.WorkingDirectory)
 	if path != "" {
-		a.launchMu.Lock()
-		a.launchPath = path
-		a.launchMu.Unlock()
+		a.queueLaunchDocument(path)
 	}
 	if a.ctx != nil {
 		runtime.WindowUnminimise(a.ctx)
 		runtime.WindowShow(a.ctx)
-		if path != "" {
-			runtime.EventsEmit(a.ctx, "agentsketch:open-file")
-		}
+	}
+}
+
+// Finder delivers document opens through Wails' macOS callback instead of argv.
+func (a *App) openFinderDocument(path string) { a.queueLaunchDocument(path) }
+
+func (a *App) queueLaunchDocument(candidate string) {
+	path := launchDocumentPath([]string{candidate}, "")
+	if path == "" {
+		return
+	}
+	a.launchMu.Lock()
+	if len(a.launchPaths) >= 32 {
+		a.launchMu.Unlock()
+		fmt.Fprintln(os.Stderr, "AgentSketch: too many pending document opens")
+		return
+	}
+	a.launchPaths = append(a.launchPaths, path)
+	ready := a.ready.Load()
+	a.launchMu.Unlock()
+	if ready && a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "agentsketch:open-file")
 	}
 }
 
@@ -135,7 +155,7 @@ func (a *App) Ready() {
 		_, _ = a.EnableAutomation()
 	}
 	a.launchMu.Lock()
-	pending := a.launchPath != ""
+	pending := len(a.launchPaths) > 0
 	a.launchMu.Unlock()
 	if pending && a.ctx != nil {
 		runtime.EventsEmit(a.ctx, "agentsketch:open-file")

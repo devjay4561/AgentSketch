@@ -15,36 +15,35 @@ concurrency:
 
 jobs:
   test:
-    name: Build & test (Windows)
-    runs-on: windows-latest
+    name: Build & test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
-
       - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
-
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-
       - name: Install dependencies
         run: npm ci
-
-      # The Go binary embeds dist/, so the frontend must be built before Go checks.
       - name: Type check & frontend build
         run: npm run build
-
       - name: Unit tests (TypeScript)
         run: npm test
-
       - name: Go vet
         run: go vet ./...
-
       - name: Go tests
         run: go test ./...
-
       - name: WebView2 browser-argument patch
+        if: runner.os == 'Windows'
         run: go test github.com/wailsapp/go-webview2/pkg/edge -run AgentSketch
+      - name: Build macOS app bundle
+        if: runner.os == 'macOS'
+        run: ./scripts/build.sh --skip-install --skip-tests --arch arm64
