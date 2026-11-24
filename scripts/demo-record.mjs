@@ -1,14 +1,19 @@
 // Records the real AgentSketch.exe while an external AI agent edits it through MCP.
 // Nothing here draws: it launches an isolated app, writes an MCP config for the agent,
 // and captures the screen until the agent goes quiet or output/demo/STOP appears.
-// Usage: node scripts/demo-record.mjs  →  output/demo/{frames/,timeline.json,mcp.json}
+// The agent (gjc) runs with an isolated config that only knows the AgentSketch MCP server,
+// so no other local tools can appear on screen.
+// Usage: [DEMO_LANG=en] [DEMO_OUT=output/demo-en] FFMPEG=<path> node scripts/demo-record.mjs
+//   →  <out>/{frames/, terminal.mp4, timeline.json}
 import {spawn} from 'node:child_process';
 import fs from 'node:fs/promises';
 import {existsSync} from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import {chromium} from 'playwright';
 
-const out = path.resolve('output/demo'), frames = path.join(out, 'frames'), profile = path.join(out, 'profile'), root = path.join(out, 'root');
+const LANG = process.env.DEMO_LANG === 'en' ? 'en' : 'ko';
+const out = path.resolve(process.env.DEMO_OUT ?? (LANG === 'en' ? 'output/demo-en' : 'output/demo')), frames = path.join(out, 'frames'), profile = path.join(out, 'profile'), root = path.join(out, 'root');
 const IDLE_STOP = Number(process.env.DEMO_IDLE_STOP ?? 90), MAX = Number(process.env.DEMO_MAX ?? 1200);
 await fs.rm(out, {recursive: true, force: true});
 for (const d of [frames, profile, root]) await fs.mkdir(d, {recursive: true});
@@ -18,7 +23,14 @@ const {live} = await import('../ai/runtime.mjs');
 // The agent's MCP server must find this isolated app instance, so it gets the same APPDATA.
 await fs.writeFile(path.join(out, 'mcp-server.mjs'),
   `process.env.APPDATA=${JSON.stringify(profile)};process.argv=[process.argv[0],'cli.mjs','mcp','--root',${JSON.stringify(root)}];await import(${JSON.stringify(new URL('../ai/cli.mjs', import.meta.url).href)});\n`);
-await fs.writeFile(path.join(out, 'mcp.json'), JSON.stringify({mcpServers: {agentsketch: {type: 'stdio', command: 'node', args: [path.join(out, 'mcp-server.mjs')], cwd: root, timeout: 120000}}}, null, 2));
+// Isolated gjc config: model credentials copied from the user's config, AgentSketch as the only MCP server and skill.
+const gjcHome = path.join(out, 'gjc-home'), userGjc = path.join(os.homedir(), '.gjc', 'agent');
+await fs.mkdir(path.join(gjcHome, 'skills'), {recursive: true});
+for (const name of ['settings.json', 'config.yml', 'models.yml', 'credential-auto-import-state.json', 'agent.db', 'agent.db-wal', 'agent.db-shm', 'models.db', 'models.db-wal', 'models.db-shm', 'model-presets', 'sdk', 'onboarding'])
+  await fs.cp(path.join(userGjc, name), path.join(gjcHome, name), {recursive: true}).catch(() => {});
+await fs.cp(path.resolve('skills/agentsketch'), path.join(gjcHome, 'skills/agentsketch'), {recursive: true, filter: file => path.basename(file) !== 'locations.json'});
+const slash = p => p.split(path.sep).join('/');
+await fs.writeFile(path.join(gjcHome, 'mcp.json'), JSON.stringify({mcpServers: {agentsketch: {type: 'stdio', sharing: 'per-session', timeout: 120000, command: 'node', args: [slash(path.join(out, 'mcp-server.mjs'))], cwd: slash(root)}}}, null, 2));
 
 const debugArgs = '--remote-debugging-port=9227 --remote-debugging-address=127.0.0.1';
 const appLog = await fs.open(path.join(out, 'app.log'), 'a');
@@ -34,13 +46,12 @@ for (let i = 0; ; i++) {
   catch (e) { if (i > 120) throw e; await sleep(250); }
 }
 // Attach to whichever app instance owns the debug port; if the agent relaunches the app, reattach.
-let browser, cdp, onFrame;
+let browser, cdp, onFrame, page;
 async function attach() {
   for (let i = 0; ; i++) {
     try { await fetch('http://127.0.0.1:9227/json'); browser = await chromium.connectOverCDP('http://127.0.0.1:9227'); break; }
     catch (e) { if (i > 600) throw e; await sleep(500); }
   }
-  let page;
   for (let i = 0; !(page = browser.contexts()[0]?.pages().find(p => p.url().includes('wails.localhost'))); i++) { if (i > 100) throw new Error('no app page'); await sleep(200); }
   cdp = await page.context().newCDPSession(page);
   await cdp.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 900, deviceScaleFactor: 1, mobile: false});
@@ -51,7 +62,13 @@ let stopping = false;
 await attach();
 // Stage setup only: blank board and the wide canvas. The agent decides everything it draws.
 const rev = async () => (await live({command: 'document.read'})).revision;
-await live({command: 'document.new', args: {title: '새 보드'}, expectedRevision: await rev()});
+if (LANG === 'en') {
+  await page.evaluate(() => localStorage.setItem('agentsketch.lang', 'en'));
+  await page.reload();
+  for (let i = 0; ; i++) { try { await live({command: 'session.read'}); break; } catch (e) { if (i > 120) throw e; await sleep(250); } }
+  await cdp.send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 900, deviceScaleFactor: 1, mobile: false});
+}
+await live({command: 'document.new', args: {title: LANG === 'en' ? 'New board' : '새 보드'}, expectedRevision: await rev()});
 await live({command: 'session.settings', args: {focus: true}, expectedRevision: await rev()});
 await sleep(800);
 
@@ -82,19 +99,21 @@ exit 1
 const place = (args) => new Promise(r => spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(out, 'window.ps1'), ...args], {stdio: 'ignore'}).on('exit', r));
 log('place app window', await place(['-ProcessId', String(app.pid), '-X', APPWIN.x, '-Y', APPWIN.y, '-W', APPWIN.w, '-H', APPWIN.h].map(String)));
 
-const prompt = path.resolve('scripts/demo-prompt.md'), title = 'AgentSketch demo · gjc';
-await fs.writeFile(path.join(out, 'agent.ps1'), `$env:APPDATA = '${profile}'
+const prompt = path.resolve(LANG === 'en' ? 'scripts/demo-prompt.en.md' : 'scripts/demo-prompt.md'), title = 'AgentSketch demo · gjc';
+await fs.writeFile(path.join(out, 'agent.ps1'), `$env:GJC_CODING_AGENT_DIR = '${gjcHome}'
+$env:APPDATA = '${profile}'
 $env:AGENTSKETCH_BROWSER_ARGUMENTS = '${debugArgs}'
 Set-Location '${root}'
 gjc --tools search_tool_bm25,skill --model opengateway/deepseek/deepseek-v4.1-flash-ultrafast '@${prompt}'
 `);
+spawn('wt.exe', ['--window', 'new', '--title', title, '--suppressApplicationTitle', 'pwsh', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', path.join(out, 'agent.ps1')], {detached: true, stdio: 'ignore'}).unref();
+log('place terminal', await place(['-Title', title, '-X', TERM.x, '-Y', TERM.y, '-W', TERM.w, '-H', TERM.h].map(String)));
+// Capture starts only after the terminal covers its screen area, so nothing behind it is recorded.
 // The terminal is captured from the screen; its start time shares the app recording's clock.
 const term = spawn(ffmpeg, ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'gdigrab', '-framerate', '30', '-draw_mouse', '0',
   '-offset_x', String(TERM.x), '-offset_y', String(TERM.y), '-video_size', `${TERM.w}x${TERM.h}`, '-i', 'desktop',
   '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '16', '-pix_fmt', 'yuv420p', path.join(out, 'terminal.mp4')], {stdio: ['pipe', 'ignore', 'inherit']});
 const termStart = Date.now() / 1000 - t0;
-spawn('wt.exe', ['--window', 'new', '--title', title, '--suppressApplicationTitle', 'pwsh', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', path.join(out, 'agent.ps1')], {detached: true, stdio: 'ignore'}).unref();
-log('place terminal', await place(['-Title', title, '-X', TERM.x, '-Y', TERM.y, '-W', TERM.w, '-H', TERM.h].map(String)));
 await fs.writeFile(path.join(out, 'READY'), 'ok');
 log('recording: agent started in terminal');
 
@@ -124,5 +143,4 @@ await fs.writeFile(path.join(out, 'timeline.json'), JSON.stringify({frames: shot
 await fs.writeFile(path.join(out, 'final.agentsketch.json'), JSON.stringify(await live({command: 'document.read'}), null, 2));
 await browser.close().catch(() => {});
 app.kill();
-for (const p of (await fetch('http://127.0.0.1:9227/json').then(r => r.json()).catch(() => []))) void p; // any agent-launched instance is left to the operator
 console.log(JSON.stringify({frames: shots.length, seconds: end.toFixed(1), changes: events.length}));

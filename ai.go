@@ -8,10 +8,40 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
 )
+
+// OPENAI_API_KEY is only attached to requests for api.openai.com, so a typed or
+// automated endpoint elsewhere can never receive the user's stored key.
+const defaultAIMemoModel = "gpt-6.2-sol"
+
+type AIMemoSettings struct {
+	Model  string `json:"model"`
+	HasKey bool   `json:"hasKey"`
+}
+
+func aiMemoSettings(getenv func(string) string) AIMemoSettings {
+	model := strings.TrimSpace(getenv("AGENTSKETCH_AI_MODEL"))
+	if model == "" {
+		model = defaultAIMemoModel
+	}
+	return AIMemoSettings{Model: model, HasKey: strings.TrimSpace(getenv("OPENAI_API_KEY")) != ""}
+}
+
+func (a *App) GetAIMemoSettings() AIMemoSettings { return aiMemoSettings(os.Getenv) }
+
+func environmentKey(endpoint, key string, getenv func(string) string) string {
+	if strings.TrimSpace(key) != "" {
+		return key
+	}
+	if u, err := assistantURL(endpoint); err == nil && u.Scheme == "https" && strings.EqualFold(u.Hostname(), "api.openai.com") {
+		return getenv("OPENAI_API_KEY")
+	}
+	return ""
+}
 
 var assistantRequests sync.Map
 var assistantSlot = make(chan struct{}, 1)
@@ -105,7 +135,7 @@ func (a *App) RequestAssistant(requestID, endpoint, key, payload string) (string
 	defer cancel()
 	assistantRequests.Store(requestID, cancel)
 	defer assistantRequests.Delete(requestID)
-	return requestAssistantHTTP(ctx, endpoint, key, payload)
+	return requestAssistantHTTP(ctx, endpoint, environmentKey(endpoint, key, os.Getenv), payload)
 }
 func (a *App) CancelAssistant(requestID string) {
 	if value, ok := assistantRequests.Load(requestID); ok {

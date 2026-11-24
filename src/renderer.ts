@@ -581,6 +581,16 @@ export class Renderer {
       }
       ctx.restore();
     }
+    if (state.aiPending) {
+      // AI memo tag above the top-right corner; orange while the structured answer is pending.
+      ctx.save(); ctx.font = `600 ${10 / zoom}px ${boardFont()}`; ctx.textBaseline = 'middle';
+      for (const node of visibleNodes) if (node.aiSource !== undefined) {
+        const pending = state.aiPending.has(node.id), label = pending ? 'AI 정리 중…' : 'AI', h = 15 / zoom, w = ctx.measureText(label).width + 10 / zoom, x = node.x + node.w - w, y = node.y - h - 3 / zoom;
+        ctx.fillStyle = pending ? ACCENT : REMOTE; ctx.beginPath(); ctx.roundRect(x, y, w, h, 3 / zoom); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.fillText(label, x + 5 / zoom, y + h / 2);
+      }
+      ctx.restore();
+    }
     if (state.marquee) {
       const b = state.marquee; ctx.fillStyle = 'rgba(247,107,21,.09)'; ctx.strokeStyle = ACCENT; ctx.lineWidth = 1 / zoom;
       ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeRect(b.x, b.y, b.w, b.h);

@@ -40,8 +40,8 @@ function fieldKey(value:unknown):string {
   return key;
 }
 
-export function validateNodeExtensions(raw:RecordValue):Pick<FlowNode,'details'|'crop'|'rotation'|'customPorts'|'textRuns'|'contentMode'|'table'|'textStyle'> {
-  const result:Pick<FlowNode,'details'|'crop'|'rotation'|'customPorts'|'textRuns'|'contentMode'|'table'|'textStyle'>={};
+export function validateNodeExtensions(raw:RecordValue):Pick<FlowNode,'details'|'crop'|'rotation'|'customPorts'|'textRuns'|'contentMode'|'table'|'textStyle'|'aiSource'> {
+  const result:Pick<FlowNode,'details'|'crop'|'rotation'|'customPorts'|'textRuns'|'contentMode'|'table'|'textStyle'|'aiSource'>={};
   if(raw.details!==undefined){
     const d=record(raw.details,'자료 정보'),details:NodeDetails={};
     if(d.documentPath!==undefined){const path=text(d.documentPath,'연결 문서 경로',8000);if(!/^(?:[a-zA-Z]:[\\/]|\\\\)/.test(path)||! /\.agentsketch$/i.test(path)||/[\x00-\x1f]/.test(path))throw new Error('연결 문서는 절대 경로의 .agentsketch 파일이어야 합니다.');details.documentPath=path;}
@@ -71,6 +71,7 @@ export function validateNodeExtensions(raw:RecordValue):Pick<FlowNode,'details'|
   if(raw.customPorts!==undefined)result.customPorts=unique(list(raw.customPorts,64,v=>{const p=record(v,'연결점');return {id:id(p.id),point:anchor(p.point)};}));
   if(raw.contentMode!==undefined)result.contentMode=choice(raw.contentMode,['text','checklist','table']);
   if(raw.textStyle!==undefined)result.textStyle=choice(raw.textStyle,['card']);
+  if(raw.aiSource!==undefined)result.aiSource=text(raw.aiSource,'AI 메모 원문',20000);
   if(raw.textRuns!==undefined)result.textRuns=normalizeTextRuns(raw.textRuns as FlowNode['textRuns']&{},text(raw.text??'','본문',50000));
   if(raw.table!==undefined)result.table=normalizeNodeTable(raw.table as NonNullable<FlowNode['table']>);
   if(result.contentMode==='table'&&!result.table)throw new Error('표 내용이 없습니다.');

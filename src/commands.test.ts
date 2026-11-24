@@ -5,7 +5,7 @@ import {commandCatalog,executeCommands,revisionOf} from './commands.ts';
 import type {FlowNode,FlowEdge} from './types.ts';
 import {nodeProperties,edgeProperties} from './commands.ts';
 // A new document field must be intentionally exposed before this compiles.
-const nodeContract:Record<Exclude<keyof FlowNode,'id'>,true>={kind:true,text:true,x:true,y:true,w:true,h:true,fill:true,stroke:true,color:true,fontSize:true,bold:true,align:true,strokeWidth:true,dashed:true,locked:true,groupId:true,assetId:true,points:true,opacity:true,details:true,crop:true,rotation:true,customPorts:true,textRuns:true,contentMode:true,table:true,textStyle:true};
+const nodeContract:Record<Exclude<keyof FlowNode,'id'>,true>={kind:true,text:true,x:true,y:true,w:true,h:true,fill:true,stroke:true,color:true,fontSize:true,bold:true,align:true,strokeWidth:true,dashed:true,locked:true,groupId:true,assetId:true,points:true,opacity:true,details:true,crop:true,rotation:true,customPorts:true,textRuns:true,contentMode:true,table:true,textStyle:true,aiSource:true};
 const edgeContract:Record<Exclude<keyof FlowEdge,'id'>,true>={from:true,to:true,fromPort:true,toPort:true,label:true,color:true,width:true,style:true,dashed:true,arrow:true,waypoints:true,relation:true,labelPosition:true,fromAnchor:true,toAnchor:true,condition:true,labelBackground:true,labelAngle:true};
 test('every editable document field is exposed to AI',()=>{assert.deepEqual(Object.keys(nodeProperties.properties).sort(),Object.keys(nodeContract).sort());assert.deepEqual(Object.keys(edgeProperties.properties).sort(),Object.keys(edgeContract).sort());});
 const setup=async()=> (await executeCommands(emptyDocument(),[

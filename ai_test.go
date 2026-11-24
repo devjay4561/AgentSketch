@@ -51,3 +51,26 @@ func TestAssistantRejectsRedirectAndOversize(t *testing.T) {
 		t.Fatal("oversize accepted")
 	}
 }
+
+func TestEnvironmentKeyOnlyForOpenAI(t *testing.T) {
+	env := func(name string) string {
+		if name == "OPENAI_API_KEY" {
+			return "env-key"
+		}
+		return ""
+	}
+	if got := environmentKey("https://api.openai.com/v1/chat/completions", "", env); got != "env-key" {
+		t.Fatalf("openai got %q", got)
+	}
+	for _, endpoint := range []string{"https://example.com/v1/chat/completions", "https://api.openai.com.evil.test/v1", "http://localhost:1/v1"} {
+		if got := environmentKey(endpoint, "", env); got != "" {
+			t.Fatalf("%s leaked key", endpoint)
+		}
+	}
+	if got := environmentKey("https://api.openai.com/v1/chat/completions", "typed", env); got != "typed" {
+		t.Fatalf("typed key replaced: %q", got)
+	}
+	if s := aiMemoSettings(env); s.Model != defaultAIMemoModel || !s.HasKey {
+		t.Fatalf("settings %+v", s)
+	}
+}

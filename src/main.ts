@@ -13,6 +13,8 @@ import { BOARD_FONTS, BOARD_FONT_IDS, boardFontId, loadBoardFont, boardFontFamil
 import { setGraphicsProfile } from './graphics.ts';
 import {addNextStep,splitConnection} from './diagram-actions.ts';
 import {setNodePlainText,editNodeText,toggleBoldRange,formatNodeTextRange} from './rich-text.ts';
+import {requestAssistant} from './assist-client.ts';
+import {OPENAI_CHAT_URL,aiMemoPayload,cleanAiMemo} from './ai-memo.ts';
 import {compareDocuments} from './review-model.ts';
 import {cloneNode,cloneEdge,cloneWorkspace} from './model.ts';
 import type { Asset, Box, FlowDocument, FlowEdge, FlowNode, Point, Port, RenderState, Tool } from './types.ts';
@@ -78,6 +80,8 @@ let booting = true, revision = 0, operationBusy = false;
 let graphicsSettings: GraphicsSettings | undefined;
 let closing = false;
 let lastSavedRecovery = 0;
+const aiPending = new Set<string>();
+let aiMemoQueue: Promise<void> = Promise.resolve();
 let aiChanged = new Set<string>(), aiTimer: ReturnType<typeof setTimeout> | undefined, aiFollow = localStorage.getItem('agentsketch.ai-follow') !== '0';
 type Gesture = {
   kind: 'pan' | 'move' | 'resize' | 'marquee' | 'create' | 'draw' | 'connect' | 'route' | 'reconnect';
@@ -109,7 +113,7 @@ function invalidate() {
     const startNode = connecting ? doc.nodes.find(n => n.id === connecting!.node) : undefined;
     if (connecting && !startNode) connecting = null;
     const view=projectVisibleDocument(doc);
-    renderer.render({ doc:view, selection: selected, edgeSelection: selectedEdge, grid, marquee, guides, remote: aiChanged, hover: hoverId, focus: focusAmount, editing, connection: reconnecting ?? (connecting && startNode ? { from: portPoint(startNode, connecting.port), to: connecting.to } : undefined) });
+    renderer.render({ doc:view, selection: selected, edgeSelection: selectedEdge, grid, marquee, guides, remote: aiChanged, aiPending, hover: hoverId, focus: focusAmount, editing, connection: reconnecting ?? (connecting && startNode ? { from: portPoint(startNode, connecting.port), to: connecting.to } : undefined) });
     const warning = $('route-warning');
     warning.hidden = renderer.blockedEdges.length === 0;
     warning.textContent = `경로 없음 ${renderer.blockedEdges.length}개 · 확인`;
@@ -230,7 +234,7 @@ function setTool(tool: Tool) {
   finishEdit(); currentTool = tool; connecting = null;
   canvas.style.cursor = tool === 'hand' ? 'grab' : tool === 'select' ? 'default' : 'crosshair';
   document.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(el => { const active = el.dataset.tool === tool; el.classList.toggle('active', active); el.setAttribute('aria-pressed', String(active)); });
-  const hints: Partial<Record<Tool, string>> = { select: '선택하고, 자유롭게 연결하세요', hand: '드래그해서 작업지를 이동하세요', connect: '시작 요소와 도착 요소를 차례로 선택하세요', text: '클릭하거나 드래그해서 글을 놓으세요', draw: '드래그해서 자유롭게 그리세요', frame: '함께 묶을 영역을 드래그하세요' };
+  const hints: Partial<Record<Tool, string>> = { select: '선택하고, 자유롭게 연결하세요', hand: '드래그해서 작업지를 이동하세요', connect: '시작 요소와 도착 요소를 차례로 선택하세요', text: '클릭하거나 드래그해서 글을 놓으세요', 'ai-note': '클릭해서 AI 메모를 놓고 자유롭게 적으세요. 편집을 마치면 AI가 정리합니다', draw: '드래그해서 자유롭게 그리세요', frame: '함께 묶을 영역을 드래그하세요' };
   $('tool-hint').textContent = hints[tool] ?? '클릭하거나 드래그해서 도형을 놓으세요';
   invalidate();
 }
@@ -287,7 +291,8 @@ canvas.addEventListener('pointerdown', e => {
       if (currentTool === 'connect') toast('다음 요소를 클릭하거나 끌어서 연결하세요.');
     } else { connecting = null; invalidate(); }
   } else if (currentTool !== 'select') {
-    const before = cloneDocument(doc), n = createNode(currentTool, p.x, p.y);
+    const before = cloneDocument(doc), n = createNode(currentTool === 'ai-note' ? 'note' : currentTool, p.x, p.y);
+    if (currentTool === 'ai-note') { n.aiSource = ''; n.text = 'AI 메모 — 막 적으면 정리해 드립니다'; }
     applyNodeDefaults(n);if(doc.workspace)n.details={pageId:doc.workspace.activePageId??DEFAULT_PAGE};
     if (currentTool === 'draw') { n.points = [{ x: 0, y: 0 }]; n.w = 1; n.h = 1; n.fill = 'transparent'; n.text = ''; }
     if (currentTool === 'frame') doc.nodes.unshift(n); else doc.nodes.push(n);
@@ -465,7 +470,7 @@ async function newLinkedDocument(){
   const node=linkCard(target,path,title,'새 문서를 만들어 연결했습니다.');
   await openLinkedCard(node);
 }
-function beginEdit(n: FlowNode) { if(!editableNodeIds(doc).has(n.id))return; finishEdit(); select([n.id]); editing = n.id; setHover(null); textEditor.value = n.text; textEditor.hidden = false; positionEditor(); invalidate(); textEditor.focus(); textEditor.select(); }
+function beginEdit(n: FlowNode) { if(!editableNodeIds(doc).has(n.id))return; finishEdit(); select([n.id]); editing = n.id; setHover(null); textEditor.value = n.aiSource ?? n.text; textEditor.hidden = false; positionEditor(); invalidate(); textEditor.focus(); textEditor.select(); }
 function positionEditor() {
   if (!editing) return; const n = doc.nodes.find(n => n.id === editing); if (!n) return;
   // The editor sits exactly on the canvas text box with the canvas typography, so
@@ -490,7 +495,35 @@ function centerEditorText(n: FlowNode) {
 function finishEdit(cancel = false) {
   if (!editing) return;
   const n = doc.nodes.find(n => n.id === editing), value = textEditor.value; editing = null; textEditor.hidden = true; invalidate();
-  if (!cancel && n && n.text !== value) { history.push(doc); editNodeText(n,value.slice(0,20000)); changed(); }
+  if (cancel || !n) return;
+  if (n.aiSource !== undefined) { finishAiMemo(n, value.slice(0, 20000)); return; }
+  if (n.text !== value) { history.push(doc); editNodeText(n,value.slice(0,20000)); changed(); }
+}
+// AI memo: keep the raw text, show it until the structured answer arrives, then replace text in one undoable step.
+function finishAiMemo(n: FlowNode, raw: string) {
+  const fresh = raw !== n.aiSource, unorganized = n.text === n.aiSource && raw.trim() !== '';
+  if (fresh) { history.push(doc); n.aiSource = raw; setNodePlainText(n, raw); changed(); }
+  if ((fresh || unorganized) && raw.trim() && !aiPending.has(n.id)) organizeAiMemo(n.id, raw);
+}
+type AiNative = { GetAIMemoSettings?(): Promise<{ model: string; hasKey: boolean }> };
+function organizeAiMemo(id: string, source: string) {
+  const native = (window as Window & { go?: { main?: { App?: AiNative } } }).go?.main?.App;
+  if (!native?.GetAIMemoSettings) { toast('AI 메모 정리는 데스크톱 앱에서 동작합니다. 원문은 그대로 보관했습니다.', true); return; }
+  const target = doc;
+  aiPending.add(id); invalidate();
+  // One request at a time: the native bridge allows a single active assistant request.
+  aiMemoQueue = aiMemoQueue.then(async () => {
+    try {
+      const settings = await native.GetAIMemoSettings!();
+      if (!settings.hasKey) throw new Error('OPENAI_API_KEY 환경변수가 없습니다. 설정 후 앱을 다시 실행하세요.');
+      const answer = cleanAiMemo(await requestAssistant(OPENAI_CHAT_URL, '', JSON.stringify(aiMemoPayload(source, settings.model)), new AbortController().signal));
+      const n = doc === target ? doc.nodes.find(n => n.id === id) : undefined;
+      // Discard when the memo changed, was removed, is being edited again, or another board is active.
+      if (!n || n.aiSource !== source || editing === id) return;
+      history.push(doc); setNodePlainText(n, answer); changed();
+    } catch (error) { toast(`AI 메모 정리 실패: ${error instanceof Error ? error.message : String(error)} 원문은 그대로 있습니다.`, true); }
+    finally { aiPending.delete(id); invalidate(); }
+  });
 }
 textEditor.addEventListener('blur', () => finishEdit());
 textEditor.addEventListener('input', () => { const n = doc.nodes.find(n => n.id === editing); if (n) centerEditorText(n); });
@@ -816,7 +849,7 @@ document.addEventListener('keydown', e => {
   if (e.key === '-') { zoomAt(doc.viewport.zoom / 1.2); return; }
   if (e.key === '?') { void action('help'); return; }
   if (e.key === '[' || e.key === ']') { void action(e.key === '[' ? 'back' : 'front'); return; }
-  const tools: Record<string, Tool> = { v: 'select', h: 'hand', r: 'rect', o: 'ellipse', d: 'diamond', t: 'text', n: 'note', c: 'connect', p: 'draw', f: 'frame' };
+  const tools: Record<string, Tool> = { v: 'select', h: 'hand', r: 'rect', o: 'ellipse', d: 'diamond', t: 'text', n: 'note', a: 'ai-note', c: 'connect', p: 'draw', f: 'frame' };
   if (tools[e.key.toLowerCase()]) setTool(tools[e.key.toLowerCase()]);
 });
 document.addEventListener('keyup', e => { if (e.code === 'Space') { space = false; canvas.style.cursor = currentTool === 'hand' ? 'grab' : 'default'; } });

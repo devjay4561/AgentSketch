@@ -22,6 +22,8 @@ export interface FlowNode extends Box {
   table?: NodeTable;
   /** 'card': first line is a title, the rest are quieter detail lines. Plain text only. */
   textStyle?: 'card';
+  /** AI memo: the user's raw text. Present (even empty) marks the memo; text holds the AI-structured version. */
+  aiSource?: string;
 }
 export interface FlowEdge {
   id: string; from: string; to: string; fromPort: Port; toPort: Port;
@@ -46,12 +48,14 @@ export interface FlowDocument {
   /** Board font id from src/fonts.ts; absent means Pretendard. */
   font?: 'suit' | 'nanum-square-neo' | 'ibm-plex-kr' | 'maru-buri' | 'pretendard';
 }
-export type Tool = 'select' | 'hand' | 'connect' | ShapeKind;
+export type Tool = 'select' | 'hand' | 'connect' | 'ai-note' | ShapeKind;
 export interface RenderState {
   doc: FlowDocument; selection: Set<string>; edgeSelection: string | null;
   grid: boolean; marquee?: Box; connection?: { from: Point; to: Point };
   guides?: { axis: 'x' | 'y'; value: number }[];
   remote?: Set<string>;
+  /** Live canvas only: AI memos waiting for a structured answer. Exports omit AI memo tags. */
+  aiPending?: Set<string>;
   /** Live canvas only: hovered node, focus fade 0–1, node whose text is in the editor. */
   hover?: string | null; focus?: number; editing?: string | null;
 }

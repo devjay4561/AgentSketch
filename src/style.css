@@ -127,6 +127,7 @@ button, summary, input, textarea, select { transition: none; }
 .tools-rail { z-index: 20; background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; gap: 13px; padding: 20px 0 12px; overflow-y: auto; }
 .tool-group { display: flex; flex-direction: column; gap: 5px; }
 .tool-button { display: flex; justify-content: center; align-items: center; position: relative; width: 42px; height: 40px; border-radius: var(--radius); color: var(--muted); }
+.tool-ai b { position: absolute; right: 3px; bottom: 3px; font-size: 8px; font-weight: 700; line-height: 1; color: #fff; background: #2F6FED; border-radius: 3px; padding: 1px 2px; }
 .tool-button:hover { background: var(--surface); color: var(--ink); }
 .tool-button.active, .tool-button[aria-pressed="true"] { color: var(--accent-text); background: var(--accent-soft); }
 .tool-button.active:hover, .tool-button[aria-pressed="true"]:hover { background: var(--accent-selected); }
