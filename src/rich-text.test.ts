@@ -52,3 +52,24 @@ test('malformed formatting cannot enter a document and unknown fields are discar
   raw.nodes[0].textRuns=[{text:node.text,bold:true,onclick:'bad'}];assert.equal('onclick' in validateDocument(raw).nodes[0].textRuns![0],false);
   raw.nodes[0].textRuns[0].text='mismatch';assert.throws(()=>validateDocument(raw));
 });
+
+test('editing text keeps formatting outside the edited span', async () => {
+  const { editNodeText, toggleBoldRange } = await import('./rich-text.ts');
+  const { createNode } = await import('./model.ts');
+  const node = createNode('rect', 0, 0);
+  node.text = '제목\n둘째\n셋째';
+  node.textRuns = [{ text: '제목', bold: true, color: '#c2410c' }, { text: '\n둘째\n' }, { text: '셋째', color: '#2563eb' }];
+  editNodeText(node, '제목\n셋째');
+  assert.equal(node.text, '제목\n셋째');
+  assert.deepEqual(node.textRuns, [{ text: '제목', bold: true, color: '#c2410c' }, { text: '\n' }, { text: '셋째', color: '#2563eb' }]);
+  editNodeText(node, '새 제목\n셋째');
+  assert.equal(node.textRuns?.[0].text, '새 제목');
+  assert.equal(node.textRuns?.[0].bold, true);
+  editNodeText(node, '');
+  assert.equal(node.textRuns, undefined);
+  node.text = 'abc'; delete node.textRuns;
+  toggleBoldRange(node, 0, 1);
+  assert.deepEqual(node.textRuns, [{ text: 'a', bold: true }, { text: 'bc' }]);
+  toggleBoldRange(node, 0, 1);
+  assert.equal(node.textRuns?.[0].bold, false);
+});

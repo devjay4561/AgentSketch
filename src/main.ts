@@ -12,7 +12,7 @@ import { tidyBoard } from './shape-themes.ts';
 import { BOARD_FONTS, BOARD_FONT_IDS, boardFontId, loadBoardFont, boardFontFamily, type BoardFontId } from './fonts.ts';
 import { setGraphicsProfile } from './graphics.ts';
 import {addNextStep,splitConnection} from './diagram-actions.ts';
-import {setNodePlainText} from './rich-text.ts';
+import {setNodePlainText,editNodeText,toggleBoldRange,formatNodeTextRange} from './rich-text.ts';
 import {compareDocuments} from './review-model.ts';
 import {cloneNode,cloneEdge,cloneWorkspace} from './model.ts';
 import type { Asset, Box, FlowDocument, FlowEdge, FlowNode, Point, Port, RenderState, Tool } from './types.ts';
@@ -490,11 +490,18 @@ function centerEditorText(n: FlowNode) {
 function finishEdit(cancel = false) {
   if (!editing) return;
   const n = doc.nodes.find(n => n.id === editing), value = textEditor.value; editing = null; textEditor.hidden = true; invalidate();
-  if (!cancel && n && n.text !== value) { history.push(doc); setNodePlainText(n,value.slice(0,20000)); changed(); }
+  if (!cancel && n && n.text !== value) { history.push(doc); editNodeText(n,value.slice(0,20000)); changed(); }
 }
 textEditor.addEventListener('blur', () => finishEdit());
 textEditor.addEventListener('input', () => { const n = doc.nodes.find(n => n.id === editing); if (n) centerEditorText(n); });
-textEditor.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); finishEdit(true); canvas.focus(); } else if (e.key.toLowerCase() === 's' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void action(e.shiftKey ? 'save-as' : 'save'); } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); finishEdit(); canvas.focus(); } e.stopPropagation(); });
+textEditor.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b' && textEditor.selectionStart < textEditor.selectionEnd) {
+    // Ctrl+B in the in-place editor: commit the text, then bold (or un-bold) the selected characters.
+    e.preventDefault(); const id = editing, start = textEditor.selectionStart, end = textEditor.selectionEnd; finishEdit();
+    const n = doc.nodes.find(n => n.id === id); if (n && n.text === textEditor.value && end <= n.text.length) mutate(() => toggleBoldRange(n, start, end), '선택한 글자의 굵기를 바꿨습니다.');
+    return;
+  }
+  if (e.key === 'Escape') { e.preventDefault(); finishEdit(true); canvas.focus(); } else if (e.key.toLowerCase() === 's' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); void action(e.shiftKey ? 'save-as' : 'save'); } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); finishEdit(); canvas.focus(); } e.stopPropagation(); });
 
 function updateUI() {
   workbench?.update(); tabs?.update();
@@ -539,9 +546,26 @@ for (const [id, key] of Object.entries(propertyKeys)) {
       if (!Number.isFinite(value)) { updateUI(); return; }
       const limits: Record<string, [number, number]> = { fontSize: [8, 160], w: [20, 100000], h: [20, 100000], x: [-1000000, 1000000], y: [-1000000, 1000000], strokeWidth: [0, 20], opacity: [.1, 1] }; const limit = limits[key]; if (limit) value = Math.min(limit[1], Math.max(limit[0], value));
     }
-    mutate(() => { for (const n of selectedNodes()) { if (!editableNodeIds(doc).has(n.id) && key !== 'locked') continue; if (n.points && (key === 'w' || key === 'h')) { const factor = Number(value) / n[key]; n.points = n.points.map(p => ({ x: key === 'w' ? p.x * factor : p.x, y: key === 'h' ? p.y * factor : p.y })); } if(key==='text')setNodePlainText(n,String(value).slice(0,20000));else Object.assign(n,{[key]:value}); } });
+    mutate(() => { for (const n of selectedNodes()) { if (!editableNodeIds(doc).has(n.id) && key !== 'locked') continue; if (n.points && (key === 'w' || key === 'h')) { const factor = Number(value) / n[key]; n.points = n.points.map(p => ({ x: key === 'w' ? p.x * factor : p.x, y: key === 'h' ? p.y * factor : p.y })); } if(key==='text')editNodeText(n,String(value).slice(0,20000));else Object.assign(n,{[key]:value}); } });
   });
 }
+// Text selected in the content box (or the in-place editor) scopes B and the text colour to that range.
+let textRange: { id: string; start: number; end: number } | undefined;
+function rememberRange(e: Event) {
+  const input = e.target as HTMLTextAreaElement, n = selectedNodes()[0];
+  textRange = selected.size === 1 && n && input.value === n.text && input.selectionStart < input.selectionEnd ? { id: n.id, start: input.selectionStart, end: input.selectionEnd } : undefined;
+}
+for (const type of ['select', 'mouseup', 'keyup']) $('node-text').addEventListener(type, rememberRange);
+$('node-text').addEventListener('input', () => { textRange = undefined; });
+function rangeTarget() {
+  const n = textRange && selected.size === 1 ? doc.nodes.find(n => n.id === textRange!.id && selected.has(n.id)) : undefined;
+  return n && editableNodeIds(doc).has(n.id) && textRange!.end <= n.text.length ? n : undefined;
+}
+for (const id of ['node-bold', 'node-color']) $(id).addEventListener('change', e => {
+  const n = rangeTarget(); if (!n) return;
+  e.stopImmediatePropagation(); const { start, end } = textRange!, color = ($(id) as HTMLInputElement).value; ($(id) as HTMLInputElement).blur();
+  mutate(() => { if (id === 'node-bold') toggleBoldRange(n, start, end); else formatNodeTextRange(n, start, end, { color }); }, id === 'node-bold' ? '선택한 글자의 굵기를 바꿨습니다.' : '선택한 글자의 색을 바꿨습니다.');
+}, true);
 const edgeKeys: Record<string, keyof FlowEdge> = { 'edge-label': 'label', 'edge-style': 'style', 'edge-color': 'color', 'edge-width': 'width', 'edge-arrow': 'arrow', 'edge-dashed': 'dashed' };
 for (const [id, key] of Object.entries(edgeKeys)) $<HTMLInputElement>(id)?.addEventListener('change', e => {
   const input = e.target as HTMLInputElement, edge = doc.edges.find(e => e.id === selectedEdge); if (!edge) return;

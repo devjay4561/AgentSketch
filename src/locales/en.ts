@@ -829,6 +829,8 @@ export const EN: Record<string, string> = {
   "빈 문서 또는 편집 가능한 예시로 현재 문서를 교체.": "Replace the current document with a blank document or an editable example.",
   "빈 보드를 만들었습니다. 왼쪽 도구로 시작하세요.": "Blank board created. Start with the tools on the left.",
   "빈 보드를 새 탭에 만들었습니다.": "Created a blank board in a new tab.",
+  "선택한 글자의 굵기를 바꿨습니다.": "Changed the weight of the selected text.",
+  "선택한 글자의 색을 바꿨습니다.": "Changed the colour of the selected text.",
   "사각형": "Rectangle",
   "사각형 (R)": "Rectangle (R)",
   "사용법 및 단축키": "How to use and shortcuts",

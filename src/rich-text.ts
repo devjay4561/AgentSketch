@@ -82,3 +82,23 @@ export function setNodeChecklist(node:FlowNode,items:readonly {id:string;text:st
   });
   node.details={...node.details,checklist};node.contentMode='checklist';
 }
+
+/** Replace the text but keep formatting outside the edited span; inserted text takes the style before it. */
+export function editNodeText(node:FlowNode,value:string):void{
+  const runs=node.textRuns?.length&&node.textRuns.map(run=>run.text).join('')===node.text?node.textRuns:undefined;
+  if(!runs||!value){setNodePlainText(node,value);return;}
+  const old=node.text;let head=0;while(head<old.length&&head<value.length&&old[head]===value[head])head++;
+  let tail=0;while(tail<old.length-head&&tail<value.length-head&&old[old.length-1-tail]===value[value.length-1-tail])tail++;
+  const slice=(from:number,to:number)=>{const out:TextRun[]=[];let offset=0;for(const run of runs){const a=Math.max(from,offset),b=Math.min(to,offset+run.text.length);if(a<b)out.push({...run,text:run.text.slice(a-offset,b-offset)});offset+=run.text.length;}return out;};
+  const before=slice(0,head),style=before.at(-1)??slice(head,head+1)[0]??{text:''};
+  setNodeRichText(node,[...before,{...style,text:value.slice(head,value.length-tail)},...slice(old.length-tail,old.length)]);
+  if(node.textRuns!.every(run=>run.bold===undefined&&run.color===undefined&&run.fontSize===undefined&&run.href===undefined))delete node.textRuns;
+}
+
+/** Bold the range, or un-bold it when every character in it is already bold. */
+export function toggleBoldRange(node:FlowNode,start:number,end:number):boolean{
+  const runs=node.textRuns?.length&&node.textRuns.map(run=>run.text).join('')===node.text?node.textRuns:[{text:node.text}];
+  let offset=0,allBold=true;
+  for(const run of runs){const finish=offset+run.text.length;if(Math.max(start,offset)<Math.min(end,finish)&&!(run.bold??node.bold))allBold=false;offset=finish;}
+  return formatNodeTextRange(node,start,end,{bold:!allBold});
+}
