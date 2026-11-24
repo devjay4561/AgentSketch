@@ -49,5 +49,10 @@ try{
   let request=flags.request?JSON.parse((await boundedRead(path.resolve(String(flags.request)))).toString('utf8').replace(/^\uFEFF/,'')):verb==='read'?{command:'document.read'}:verb==='validate'?{command:'document.diagnose'}:JSON.parse(await new Promise(resolve=>{let s='';process.stdin.setEncoding('utf8');process.stdin.on('data',c=>{s+=c;if(s.length>90*1024*1024)process.exit(2);});process.stdin.on('end',()=>resolve(s));}));
   if(flags.live)request.target={live:true};else if(flags.file)request.target={file:String(flags.file)};if(flags.out)request.output=String(flags.out);if(flags['dry-run'])request.dryRun=true;if(flags.overwrite)request.overwrite=true;
   emit({ok:true,result:await execute(request,{root})});
- }else emit({usage:['agentsketch capabilities --query node','agentsketch execute --file board.agentsketch --request commands.json --root C:\\work','agentsketch read --live','agentsketch connect --exe C:\\path\\AgentSketch.exe','agentsketch mcp --root C:\\work'],protocol:1,node:'24 or newer'});
+ }else {
+  const command=process.platform==='win32'?'agentsketch.cmd':'./agentsketch';
+  const rootExample=process.platform==='win32'?'C:\\work':'"$HOME/work"';
+  const executableExample=process.platform==='win32'?'C:\\path\\AgentSketch.exe':'/Applications/AgentSketch.app/Contents/MacOS/AgentSketch';
+  emit({usage:[`${command} capabilities --query node`,`${command} execute --file board.agentsketch --request commands.json --root ${rootExample}`,`${command} read --live`,`${command} connect --exe ${executableExample}`,`${command} mcp --root ${rootExample}`],protocol:1,node:'24 or newer'});
+ }
 }catch(e){emit({ok:false,error:toolError(e)});process.exitCode=1;}

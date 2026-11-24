@@ -44,11 +44,11 @@ func TestRecoveredWorkRemembersItsSavedFile(t *testing.T) {
 func TestDroppedDocumentOpensWithItsPath(t *testing.T) {
 	app := &App{}
 	app.fileDropped(nil, []string{`C:\boards\a.agentsketch`, `C:\boards\b.agentsketch`})
-	if app.launchPath != "" {
+	if len(app.launchPaths) != 0 {
 		t.Fatal("multiple dropped files must not open")
 	}
 	app.fileDropped(nil, []string{`C:\pictures\a.png`})
-	if app.launchPath != "" {
+	if len(app.launchPaths) != 0 {
 		t.Fatal("images are not documents")
 	}
 }

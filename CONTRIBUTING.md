@@ -10,12 +10,20 @@
 
 ## 개발 환경
 
-Windows 10/11, Go 1.26+, Node.js 24 LTS, Microsoft Edge(UI 검사용)가 필요합니다.
+Go 1.26+, Node.js 24 LTS, npm이 필요합니다. Windows 빌드는 Windows 10/11, Edge와 PowerShell이 필요하고, macOS 빌드는 macOS 12+와 Xcode Command Line Tools가 필요합니다.
 
 ```powershell
 npm ci
 npm run dev -- --port 18440   # 브라우저 개발 모드
 ./scripts/build.ps1           # 전체 빌드 + 테스트 → build/bin/AgentSketch.exe
+```
+
+macOS에서는 다음 명령으로 `.app`을 빌드합니다.
+
+```sh
+./scripts/build.sh --arch arm64
+./scripts/build.sh --arch universal   # arm64와 Intel 빌드를 모두 지원할 때
+./scripts/package-macos.sh            # .app ZIP과 DMG
 ```
 
 ## PR 전에 확인할 것
@@ -27,6 +35,8 @@ go vet ./...
 go test ./...
 go test github.com/wailsapp/go-webview2/pkg/edge -run AgentSketch
 ```
+
+WebView2 패치 검사는 Windows에서만 실행합니다. macOS 검증은 `go test ./...` 및 `./scripts/build.sh`를 사용합니다.
 
 편집 화면을 바꿨다면 개발 서버(18440)를 띄운 상태에서 UI 회귀 검사도 실행해 주세요.
 

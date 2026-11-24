@@ -6,53 +6,75 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  windows:
     name: Build Windows release
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
-
       - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
-
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-
-      - name: Build (npm ci → frontend → tests → Wails)
+      - name: Build and test
         run: ./scripts/build.ps1
-
       - name: Package
         run: ./scripts/package.ps1
-
-      - name: Checksums
-        working-directory: release
-        run: |
-          Get-FileHash -Algorithm SHA256 -LiteralPath AgentSketch-Windows.zip, AgentSketch-source.zip |
-            ForEach-Object { '{0}  {1}' -f $_.Hash.ToLowerInvariant(), (Split-Path -Leaf $_.Path) } |
-            Set-Content -Encoding ascii SHA256SUMS.txt
-          Get-Content SHA256SUMS.txt
-
       - uses: actions/upload-artifact@v4
         with:
-          name: AgentSketch-${{ github.ref_name }}
+          name: agentsketch-windows
           path: |
             release/AgentSketch-Windows.zip
             release/AgentSketch-source.zip
-            release/SHA256SUMS.txt
 
+  macos:
+    name: Build macOS universal release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - name: Build and test
+        run: ./scripts/build.sh --arch universal
+      - name: Package app bundle
+        run: ./scripts/package-macos.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agentsketch-macos
+          path: |
+            release/AgentSketch-macOS-*.zip
+            release/AgentSketch-macOS-*.dmg
+
+  publish:
+    name: Publish one combined release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: agentsketch-*
+          path: release
+          merge-multiple: true
+      - name: Checksums
+        working-directory: release
+        run: find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: |
-            release/AgentSketch-Windows.zip
-            release/AgentSketch-source.zip
-            release/SHA256SUMS.txt
+          files: release/*

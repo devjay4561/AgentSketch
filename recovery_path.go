@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // The recovery file holds the latest edit; this sidecar remembers which saved file
@@ -76,8 +74,5 @@ func (a *App) fileDropped(ctx context.Context, paths []string) {
 	if len(paths) != 1 || !isDocumentPath(paths[0]) || !filepath.IsAbs(paths[0]) {
 		return
 	}
-	a.launchMu.Lock()
-	a.launchPath = paths[0]
-	a.launchMu.Unlock()
-	runtime.EventsEmit(ctx, "agentsketch:open-file")
+	a.queueLaunchDocument(paths[0])
 }

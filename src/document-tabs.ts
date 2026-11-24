@@ -91,7 +91,7 @@ export function mountDocumentTabs(host:TabsHost,container:HTMLElement) {
     });
     removed.forEach(id=>deleted.delete(id));persistedRevision=savedRevision;
     await (window as any).go?.main?.App?.RecordOpenDocuments?.(tabs.map(t=>t.path).filter(Boolean));
-    if(savedRevision===revision){status.textContent='탭 복구 저장됨';status.title='탭 복구와 원본 파일 저장은 별개입니다. Ctrl+S로 파일을 저장하세요.';}
+    if(savedRevision===revision){status.textContent='탭 복구 저장됨';status.title=t('탭 복구와 원본 파일 저장은 별개입니다. Ctrl+S로 파일을 저장하세요.');}
   }
   function flush():Promise<void>{
     clearTimeout(timer);

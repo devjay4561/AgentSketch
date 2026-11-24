@@ -22,6 +22,13 @@
 - 붙여넣은 이미지를 화면에 원본과 같은 크기로 배치하고, 긴 변 3840px 이하는 다시 압축하지 않고 원본 그대로 저장합니다. 확대할 때 더 자주 선명한 해상도로 다시 그립니다.
 - 도형·연결선 디자인 개선: 일관된 모서리, 부드러운 그림자(GPU 켬)와 그림자 대체 표현(GPU 끔), 둥근 직각 꺾임, 날렵한 화살촉, 알약 모양 연결선 라벨, 새 예시 보드. 기존 문서에 저장된 색과 두께는 그대로 유지합니다.
 
+## [0.1.2] - 2026-11-04
+
+### Added
+
+- macOS arm64 및 universal `.app` 빌드와 Windows/macOS CI·통합 릴리스 작업을 추가했습니다. Apple Vision OCR, Finder 문서 연결, macOS용 CLI 래퍼를 제공합니다.
+- macOS 앱은 Developer ID 서명과 공증 없이 배포되며, Gatekeeper 첫 실행 안내를 추가했습니다.
+
 ## [0.1.1] - 2026-11-02
 
 ### Added
@@ -50,6 +57,8 @@
 - 자동 복구, 단일 인스턴스, 사용자별 NSIS 설치 파일
 - 설명용 예시 보드: *서비스 출시 준비 지도*, *간단한 업무 흐름*
 
-[Unreleased]: https://github.com/devjay4561/AgentSketch/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/devjay4561/AgentSketch/compare/v0.1.2...HEAD
 [0.1.1]: https://github.com/devjay4561/AgentSketch/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/devjay4561/AgentSketch/releases/tag/v0.1.0
+
+[0.1.2]: https://github.com/devjay4561/AgentSketch/compare/v0.1.0...v0.1.2
